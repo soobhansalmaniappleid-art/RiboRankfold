@@ -1,0 +1,7 @@
+comparison,metric,mean,ci_low,ci_high
+low_clash_vs_contact_topology_tuned,delta_mean_best_of_k,0.061299692493044136,-0.016808306096284715,0.1511575973801536
+low_clash_vs_contact_topology_tuned,delta_oracle_hit_rate,0.1,0.0,0.3
+contact_vs_contact_topology_tuned,delta_mean_best_of_k,0.11559926045486595,0.028401695830680078,0.2070706082484923
+contact_vs_contact_topology_tuned,delta_oracle_hit_rate,0.10065,0.0,0.3
+hybrid_vs_contact_topology_tuned,delta_mean_best_of_k,0.11973025350965193,0.024705367285085447,0.2157899878333505
+hybrid_vs_contact_topology_tuned,delta_oracle_hit_rate,0.10235000000000001,0.0,0.3

@@ -1,0 +1,5 @@
+method,targets,pairwise_comparisons,mean_pairwise_accuracy
+compact,10,96463,0.6566318660401114
+hybrid,10,96463,0.6388139629543395
+contact,10,96463,0.6258264217467678
+low_clash,10,96463,0.08398972064277656

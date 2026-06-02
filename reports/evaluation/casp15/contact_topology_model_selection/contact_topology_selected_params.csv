@@ -1,0 +1,4 @@
+heldout_oracle_group,selected_params,n_estimators,max_depth,learning_rate,min_samples_leaf
+TS128,ne240_d2_lr0.05_leaf1,240,2,0.05,1
+TS232,ne80_d1_lr0.03_leaf4,80,1,0.03,4
+TS285,ne160_d1_lr0.05_leaf1,160,1,0.05,1
