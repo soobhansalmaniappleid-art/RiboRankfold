@@ -21,6 +21,8 @@ def main() -> None:
     features = pd.read_csv(args.eval_dir / "features.csv")
     ties_path = args.eval_dir / "score_ties.csv"
     ties = pd.read_csv(ties_path) if ties_path.exists() else None
+    random_path = args.eval_dir / "pick_diagnostics.csv"
+    versus_random = pd.read_csv(random_path) if random_path.exists() else None
 
     lines: list[str] = []
     lines.append(f"# {args.title}")
@@ -32,6 +34,27 @@ def main() -> None:
     lines.append(f"- Candidate source: {args.candidate_source}")
     lines.append("- Metric status: internal chain/window-aware `TM-like`, not official US-align TM-score")
     lines.append("")
+
+    if versus_random is not None:
+        lines.append("## Versus Random Selection")
+        lines.append("")
+        lines.append(
+            "Read this first. `random` is the exact expectation of picking at random "
+            "from the same pools; `verdict` compares each mode's best-of-k with the "
+            "95% interval of random selection."
+        )
+        lines.append("")
+        lines.append(versus_random.to_markdown(index=False))
+        lines.append("")
+        below = versus_random[versus_random["verdict"] == "below random"]["method"].tolist()
+        above = versus_random[versus_random["verdict"] == "above random"]["method"].tolist()
+        if below:
+            lines.append(
+                "Worse than random selection: " + ", ".join(f"`{m}`" for m in below) + "."
+            )
+        if not above:
+            lines.append("No mode beats random selection.")
+        lines.append("")
 
     lines.append("## Top-5 Recovery")
     lines.append("")

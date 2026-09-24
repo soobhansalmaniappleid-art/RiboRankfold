@@ -61,15 +61,53 @@ by the sort implementation. Re-running the identical code under a different
 pandas version moved the `real` benchmark's `low_clash` oracle hit rate from
 0.675 to 0.725 with no change in logic.
 
-Since commit `deterministic tie-breaking`, every ordering in `riborank.ranking`
-uses a stable sort with `candidate_id` as the final key, so results are
-reproducible. The underlying point stands and is reported alongside the metrics:
+Every ordering in `riborank.ranking` now uses a stable sort with a tie key.
+The key has to satisfy two conditions, and the first attempt only met one:
+
+1. **Deterministic**, so results do not depend on the pandas version.
+2. **Uninformative**, so the tie-break cannot carry signal.
+
+The first fix used `candidate_id` itself, which is deterministic but not
+uninformative. Filenames encode how candidates were made: in the synthetic
+`real` benchmark, `decoy_001_small_noise` sorts before every other decoy, so a
+mode that tied on everything "found" the least-perturbed decoy. `low_clash`
+reached hit@1 = 0.625 that way. Reversing the alphabetical order dropped it
+to **0.000**, with the score unchanged.
+
+The tie key is now a SHA-256 hash of `candidate_id`: reproducible, and
+unrelated to how anyone names files.
+`tests/test_random_baseline.py::test_tie_break_does_not_follow_candidate_names`
+builds 40 targets whose names sort in quality order and checks that a fully tied
+mode does not inherit that order.
+
+The underlying point stands and is reported alongside the metrics:
 
 > **A scoring mode that ties on most of its input is not ranking. Read
 > `score_ties.csv` before reading `method_metrics.csv`.**
 
 `low_clash` should be understood as "reject structures with visible geometric
 defects, then pick arbitrarily", which is a useful filter and not a ranker.
+
+## Compare against random selection first
+
+`pick_diagnostics.csv` puts every mode next to picking candidates at random
+from the same pools. It is the first section of every generated report.
+
+| column | meaning | random expectation |
+|---|---|---|
+| `mean_percentile_of_pick` | where the top-1 pick sits in its pool; 100 is the best candidate | 50 (exact) |
+| `hit@k` | share of targets whose best candidate is in the top k | `k / pool size` (exact) |
+| `best_of_k` | mean quality of the best candidate in the top k | exact, from the order statistics |
+| `verdict` | `best_of_k` against the 95% interval of random selection | — |
+
+The expected best of `k` random draws is computed exactly. With the pool sorted
+ascending, the i-th value is the maximum of a random k-subset with probability
+`C(i-1, k-1) / C(n, k)`. A test checks this against brute-force enumeration of
+every subset. The interval comes from seeded resampling and is used only for the
+verdict.
+
+Until this table existed, no report here said what random selection would
+score. On CASP15 most modes are below it.
 
 ## `oracle_hit_rate` is the headline
 

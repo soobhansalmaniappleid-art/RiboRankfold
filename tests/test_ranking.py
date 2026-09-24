@@ -32,6 +32,7 @@ def make_frame(n: int = 10, seed: int = 0) -> pd.DataFrame:
             "backbone_break_fraction": rng.random(n),
             "compactness": rng.random(n),
             "radius_of_gyration": rng.random(n) + 10.0,
+            "num_residues": rng.integers(20, 200, n),
         }
     )
 
@@ -114,7 +115,7 @@ def test_empty_input_produces_empty_output():
 def test_summary_reports_one_row_per_method_and_oracle():
     frame = add_scores(make_frame())
     summary = summarize_methods(evaluate_per_target(frame, top_k=3))
-    assert len(summary) == 8  # 4 methods x 2 oracle definitions
+    assert len(summary) == 10  # 5 methods x 2 oracle definitions
     assert set(summary["oracle_type"]) == {"tm_like", "multi_metric"}
 
 

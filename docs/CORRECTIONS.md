@@ -89,7 +89,8 @@ Porting them is tracked in the README's "Known gaps".
 ### Guard against recurrence
 
 - `riborank.ranking.rank_by_score` and `_sort_by_oracle` use `kind="stable"` with
-  `candidate_id` as the last key.
+  a hash of `candidate_id` as the last key. The first version of this guard
+  used `candidate_id` directly, which caused the second correction below.
 - `riborank.ranking.tie_diagnostics` computes the tied fraction per mode, and it
   is written to `score_ties.csv` and printed in every generated report *above*
   the metrics table.
@@ -104,3 +105,41 @@ they worked — the shuffled-group control correctly demolished the group
 calibration result. But no audit was pointed at the **baselines**. A control that
 only interrogates the thing you hope is working will not catch a broken number in
 the thing you assume is trivial.
+
+## 2026-09-24 — the first tie-break fix leaked labels through filenames
+
+### What happened
+
+The fix above made every ordering deterministic by using `candidate_id` as the
+final sort key. That is deterministic, but it isn't neutral. Filenames record
+how candidates were generated, and alphabetical order follows those names.
+
+In the synthetic `real` benchmark, each target's decoys are named
+`decoy_001_small_noise`, `decoy_002_medium_noise`, and so on. The least
+perturbed decoy sorts first. `low_clash` ties across a median of 8 candidates
+at its top score, so an alphabetical tie-break handed it `decoy_001_small_noise`
+on 27 of 40 targets.
+
+| tie-break | `low_clash` hit@1 on `real` |
+|---|---:|
+| `candidate_id`, A→Z | 0.625 |
+| `candidate_id`, Z→A | **0.000** |
+| SHA-256 of `candidate_id` | **0.000** |
+
+The score was identical in all three rows. The whole 0.625 came from the
+filenames.
+
+### Fix
+
+The tie key is now the SHA-256 hash of `candidate_id`
+(`riborank.ranking.tie_key`). It is reproducible, and it has no relationship to
+how files are named. `tests/test_random_baseline.py::
+test_tie_break_does_not_follow_candidate_names` builds 40 targets whose names
+sort in quality order and asserts that a fully tied mode does not recover that
+order. Under the alphabetical key the test would score 1.0; under the hash it
+must stay near chance (0.1).
+
+### Lesson
+
+A tie-break is part of the model whenever ties are common. It has to be chosen
+to carry no information, and "deterministic" doesn't guarantee that.

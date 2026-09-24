@@ -8,6 +8,7 @@ candidate appears in the selected top-k.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import math
 
@@ -16,15 +17,37 @@ import pandas as pd
 
 from riborank.scoring import SCORE_COLUMNS, method_name
 
-# Every ordering in this module ends with ``candidate_id`` and uses a stable
-# sort. Without that, ties are broken by whatever order the underlying sort
-# happens to produce, which differs between pandas versions -- and the
-# ``low_clash`` baseline ties on the majority of its candidates. See
-# docs/METRICS.md, "Tie-breaking".
-TIE_BREAK = "candidate_id"
+# Every ordering in this module ends with a tie key and uses a stable sort.
+#
+# The tie key must be deterministic AND carry no information. Both halves were
+# learned the hard way (docs/CORRECTIONS.md):
+#
+# * With no tie key, ties were broken by the sort implementation, which changed
+#   between pandas versions.
+# * With ``candidate_id`` itself as the key, ties were broken alphabetically,
+#   and filenames are not neutral: in the synthetic benchmark
+#   ``decoy_001_small_noise`` sorts first, so a mode that tied on everything
+#   "found" the least-perturbed decoy 62.5% of the time. Reversing the order
+#   dropped that to 0%.
+#
+# A hash of the ID is reproducible and uncorrelated with how files are named.
+TIE_KEY = "_tie_key"
 
-TM_SORT = (["true_tm_like", "true_rmsd", TIE_BREAK], [False, True, True])
-MULTI_SORT = (["multi_metric_quality", "true_tm_like", TIE_BREAK], [False, False, True])
+TM_SORT = (["true_tm_like", "true_rmsd", TIE_KEY], [False, True, True])
+MULTI_SORT = (["multi_metric_quality", "true_tm_like", TIE_KEY], [False, False, True])
+
+
+def tie_key(candidate_ids: pd.Series) -> pd.Series:
+    """Deterministic, naming-independent ordering key for tied candidates."""
+    return candidate_ids.astype(str).map(
+        lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest()
+    )
+
+
+def _with_tie_key(frame: pd.DataFrame) -> pd.DataFrame:
+    if TIE_KEY in frame.columns:
+        return frame
+    return frame.assign(**{TIE_KEY: tie_key(frame["candidate_id"])})
 
 
 def _oracle_sort(oracle_type: str) -> tuple[list[str], list[bool]]:
@@ -33,13 +56,13 @@ def _oracle_sort(oracle_type: str) -> tuple[list[str], list[bool]]:
 
 def _sort_by_oracle(frame: pd.DataFrame, oracle_type: str) -> pd.DataFrame:
     columns, ascending = _oracle_sort(oracle_type)
-    return frame.sort_values(by=columns, ascending=ascending, kind="stable")
+    return _with_tie_key(frame).sort_values(by=columns, ascending=ascending, kind="stable")
 
 
 def rank_by_score(frame: pd.DataFrame, score_column: str) -> pd.DataFrame:
     """Deterministically order candidates by a scoring mode, best first."""
-    return frame.sort_values(
-        by=[score_column, TIE_BREAK], ascending=[False, True], kind="stable"
+    return _with_tie_key(frame).sort_values(
+        by=[score_column, TIE_KEY], ascending=[False, True], kind="stable"
     )
 
 
@@ -232,3 +255,134 @@ def source_shift_summary(features: pd.DataFrame, top_k: int = 5) -> pd.DataFrame
                 }
             )
     return pd.DataFrame(rows)
+
+
+# -- comparison against random selection ---------------------------------
+#
+# Every number above is meaningless without this section. Until it existed, no
+# report in this repository said what picking candidates at random would score,
+# and on CASP15 every baseline turned out to be *below* it.
+
+DEFAULT_HIT_KS = (1, 5, 10, 25)
+
+
+def expected_random_best_of_k(values: np.ndarray, k: int) -> float:
+    """Exact expected maximum of ``k`` values drawn without replacement.
+
+    With values sorted ascending, the i-th smallest (1-based) is the maximum of
+    a random k-subset with probability ``C(i-1, k-1) / C(n, k)``.
+    """
+    ordered = np.sort(np.asarray(values, dtype=float))
+    n = len(ordered)
+    if n == 0:
+        return np.nan
+    k = min(k, n)
+    total = math.comb(n, k)
+    weights = np.array([math.comb(i - 1, k - 1) for i in range(1, n + 1)], dtype=float)
+    return float((weights * ordered).sum() / total)
+
+
+def _percentile_within(values: np.ndarray, value: float) -> float:
+    """Share of the *other* candidates strictly worse than ``value``, in [0, 100]."""
+    n = len(values)
+    if n < 2:
+        return np.nan
+    return 100.0 * float((values < value).sum()) / (n - 1)
+
+
+def pick_diagnostics(
+    features: pd.DataFrame,
+    top_k: int = 5,
+    hit_ks: tuple[int, ...] = DEFAULT_HIT_KS,
+    draws: int = 2000,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Score every mode against random selection on the same pools.
+
+    Columns:
+
+    * ``mean_percentile_of_pick`` -- where the top-1 pick sits in its pool
+      (100 = best, random expectation ~50).
+    * ``hit@k`` -- fraction of targets whose best candidate is in the top k.
+    * ``best_of_{top_k}`` -- mean quality of the best of the top ``top_k``.
+    * ``verdict`` -- ``best_of_{top_k}`` against the 95% interval of random
+      selection: ``below random``, ``within random`` or ``above random``.
+
+    A final ``random`` row carries the exact random expectations.
+    """
+    labeled = features.dropna(subset=["true_tm_like"])
+    if labeled.empty:
+        return pd.DataFrame()
+    groups = [(target_id, group) for target_id, group in labeled.groupby("target_id")]
+    best_col = f"best_of_{top_k}"
+
+    rows = []
+    for score_column in SCORE_COLUMNS:
+        if score_column not in labeled.columns:
+            continue
+        percentiles, best_of_k = [], []
+        hits = {k: [] for k in hit_ks}
+        for _, group in groups:
+            ranked = rank_by_score(group, score_column)
+            values = ranked["true_tm_like"].to_numpy()
+            percentiles.append(_percentile_within(values, values[0]))
+            best_of_k.append(float(values[:top_k].max()))
+            oracle = _sort_by_oracle(group, "tm_like").iloc[0].candidate_id
+            order = list(ranked["candidate_id"])
+            for k in hit_ks:
+                hits[k].append(oracle in order[:k])
+        row = {
+            "method": method_name(score_column),
+            "mean_percentile_of_pick": float(np.nanmean(percentiles)),
+            best_col: float(np.mean(best_of_k)),
+        }
+        row.update({f"hit@{k}": float(np.mean(hits[k])) for k in hit_ks})
+        rows.append(row)
+
+    # Exact random expectations.
+    random_row = {
+        "method": "random",
+        "mean_percentile_of_pick": float(
+            np.nanmean(
+                [
+                    np.mean([_percentile_within(g["true_tm_like"].to_numpy(), v)
+                             for v in g["true_tm_like"].to_numpy()])
+                    for _, g in groups
+                ]
+            )
+        ),
+        best_col: float(
+            np.mean([expected_random_best_of_k(g["true_tm_like"].to_numpy(), top_k)
+                     for _, g in groups])
+        ),
+    }
+    random_row.update(
+        {f"hit@{k}": float(np.mean([min(k, len(g)) / len(g) for _, g in groups]))
+         for k in hit_ks}
+    )
+
+    # Seeded interval for the random mean best-of-k across targets.
+    rng = np.random.default_rng(seed)
+    pools = [g["true_tm_like"].to_numpy() for _, g in groups]
+    samples = np.empty(draws)
+    for draw in range(draws):
+        samples[draw] = np.mean(
+            [pool[rng.choice(len(pool), size=min(top_k, len(pool)), replace=False)].max()
+             for pool in pools]
+        )
+    low, high = np.percentile(samples, [2.5, 97.5])
+
+    frame = pd.DataFrame(rows)
+    frame["random_low"] = float(low)
+    frame["random_high"] = float(high)
+    frame["verdict"] = np.where(
+        frame[best_col] < low,
+        "below random",
+        np.where(frame[best_col] > high, "above random", "within random"),
+    )
+    random_row.update({"random_low": float(low), "random_high": float(high),
+                       "verdict": "reference"})
+    frame = pd.concat([frame, pd.DataFrame([random_row])], ignore_index=True)
+    ordered = ["method", "verdict", best_col, "random_low", "random_high",
+               "mean_percentile_of_pick", *[f"hit@{k}" for k in hit_ks]]
+    return frame[ordered]

@@ -23,6 +23,7 @@ def render_ensemble_report(
     source_shift: pd.DataFrame,
     top_k: int,
     ties: pd.DataFrame | None = None,
+    versus_random: pd.DataFrame | None = None,
 ) -> str:
     source_counts = (
         features["candidate_source"].value_counts().rename_axis("source").reset_index(name="count")
@@ -58,6 +59,21 @@ def render_ensemble_report(
             ]
         )
         return "\n".join(lines)
+
+    if versus_random is not None and not versus_random.empty:
+        lines.extend(
+            [
+                "## Versus Random Selection",
+                "",
+                "Read this first. Each mode is compared with picking candidates at "
+                "random from the same pools. `random` holds the exact expectation; "
+                "`verdict` places each mode's best-of-k against the 95% interval of "
+                "random selection. A mode below random is worse than no model.",
+                "",
+                versus_random.to_markdown(index=False),
+                "",
+            ]
+        )
 
     lines.extend(
         [
