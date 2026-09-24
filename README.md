@@ -5,9 +5,16 @@ Two things live in this repository:
 1. **`riborank/`** — an evaluation harness for *ranking* RNA 3D structure
    candidates. Given many predicted structures for one target, can a scoring
    function retrieve the best one?
-2. **`discovery/`** — a staged funnel for genomic discovery, where deterministic
-   detectors run first and a language model runs last. See
-   [docs/DISCOVERY.md](docs/DISCOVERY.md).
+2. **`discovery/`** — deterministic detectors and a staged funnel: sequence
+   statistics, tandem repeat arrays, neighbourhood novelty, multiplicative
+   scoring. See [docs/DISCOVERY.md](docs/DISCOVERY.md).
+3. **`sde/`** — the Scientific Discovery Engine: a tool registry an agent may
+   request from but cannot bypass, append-only candidate state, a dynamic
+   investigation loop, adversarial review and an auditable report. RiboRank is
+   one of its instruments. See [docs/ENGINE.md](docs/ENGINE.md).
+
+The dependency runs one way: `sde` imports `riborank` and `discovery`; neither
+imports `sde`.
 
 ## Status, stated plainly
 
@@ -63,7 +70,7 @@ were measured here; three of them corrected my own earlier fixes.
 
 ```bash
 pip install -e ".[dev,ml]"
-pytest                      # 208 tests
+pytest                      # 288 tests
 ```
 
 Requires Python 3.11+.
@@ -110,13 +117,17 @@ python scripts/evaluate_structural_ensemble.py \
     --no-usalign --benchmark-kind controlled_decoy
 ```
 
-## Run the discovery demo
+## Run the demos
 
 ```bash
-python -m discovery.demo
+python -m discovery.demo   # the deterministic funnel
+python -m sde.demo         # the full engine: loop, adversary, report
 ```
 
-Synthetic data, so it demonstrates the mechanism rather than a result.
+Both use synthetic data, so they demonstrate the mechanism rather than a result.
+The engine demo ends by *refusing* to claim novelty, because the tool that would
+settle it (`infernal_scan`) is not installed — which is the behaviour the design
+exists to produce.
 
 ## How to read the reports
 
@@ -161,10 +172,19 @@ discovery/          staged discovery funnel  (docs/DISCOVERY.md)
   agents/             LLM protocol, four adversarial roles, review
   demo.py             end-to-end run on synthetic data
 
+sde/                Scientific Discovery Engine  (docs/ENGINE.md)
+  registry.py         tools an agent may request; whitelist, cost, inputs
+  state.py            append-only candidate state and provenance log
+  loop.py             observe -> hypothesise -> request -> execute -> stop
+  adversary.py        four challenges that try to destroy the claim
+  report.py           report generated from the event log alone
+  tools/builtin.py    adapters over discovery/ and riborank/
+  demo.py             end-to-end run on synthetic data
+
 scripts/            CLI entry points
-tests/              208 tests, mostly offline
+tests/              288 tests, mostly offline
 reports/            generated evaluation artifacts
-docs/               CONTRACT, METRICS, CORRECTIONS, DISCOVERY, VENDORED
+docs/               CONTRACT, METRICS, CORRECTIONS, DISCOVERY, ENGINE, VENDORED
 ```
 
 ## Known gaps
@@ -191,8 +211,10 @@ These are real and unhidden:
   oracle group collapses it to zero and a shuffled-group control reaches 0.3 by
   chance. It was a group-ID shortcut, not structural signal. That audit is the
   best work in this repository and its conclusion stands.
-- **`discovery/` has never touched real data.** No ingestion, no MMseqs2/HMMER
-  adapters, no real LLM client.
+- **The engine cannot find candidates, only investigate ones it is handed.**
+  `hmmsearch` and `mmseqs_cluster` are declared but not installed, and they are
+  the step that makes a billion-sequence space tractable. Neither `discovery/`
+  nor `sde/` has touched real data.
 - **No CI.** Tests run locally only.
 
 ## What was removed

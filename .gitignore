@@ -21,8 +21,8 @@ node_modules/
 
 # Large regenerable benchmark data.
 # Everything under data/casp15_rna/ except native_map.csv is rebuilt by:
-#   python -m riborank.cli download-casp15-predictions
-#   python -m riborank.cli download-casp15-natives
+#   python scripts/download_casp15_predictions.py
+#   python scripts/download_casp15_natives.py
 data/casp15_rna/candidates/
 data/casp15_rna/downloads/
 data/casp15_rna/natives/

@@ -24,11 +24,8 @@ dev = [
     "ruff>=0.6",
 ]
 
-[project.scripts]
-riborank = "riborank.cli:main"
-
 [tool.setuptools]
-packages = ["riborank", "discovery", "discovery.features", "discovery.agents"]
+packages = ["riborank", "discovery", "discovery.features", "discovery.agents", "sde", "sde.tools"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
