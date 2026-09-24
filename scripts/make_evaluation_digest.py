@@ -19,6 +19,8 @@ def main() -> None:
     pairwise = pd.read_csv(args.eval_dir / "pairwise_accuracy.csv")
     per_target = pd.read_csv(args.eval_dir / "per_target_metrics.csv")
     features = pd.read_csv(args.eval_dir / "features.csv")
+    ties_path = args.eval_dir / "score_ties.csv"
+    ties = pd.read_csv(ties_path) if ties_path.exists() else None
 
     lines: list[str] = []
     lines.append(f"# {args.title}")
@@ -45,6 +47,26 @@ def main() -> None:
     ]
     lines.append(method[method_cols].to_markdown(index=False))
     lines.append("")
+
+    if ties is not None:
+        lines.append("## Score Ties")
+        lines.append("")
+        lines.append(
+            "Read this before the table above. A scoring mode that assigns the same "
+            "score to most of its candidates is not ranking them; its top-5 is decided "
+            "by the tie-break. See docs/METRICS.md."
+        )
+        lines.append("")
+        lines.append(ties.to_markdown(index=False))
+        lines.append("")
+        degenerate = ties[ties["tied_fraction"] > 0.5]["method"].tolist()
+        if degenerate:
+            lines.append(
+                "Modes whose ordering is mostly ties: "
+                + ", ".join(f"`{name}`" for name in degenerate)
+                + ". Their metrics are not evidence of ranking skill."
+            )
+            lines.append("")
 
     lines.append("## Pairwise Ranking Accuracy")
     lines.append("")

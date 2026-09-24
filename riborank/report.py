@@ -1,0 +1,98 @@
+"""Markdown report rendering."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+
+METRIC_CAVEAT = (
+    "`tm_like` is an internal TM-score-shaped statistic computed from chain/window "
+    "aligned RMSD, not official US-align TM-score. Values are internally comparable "
+    "but must not be compared against published CASP TM-scores."
+)
+
+
+def render_ensemble_report(
+    dataset_name: str,
+    candidates_root: Path,
+    features: pd.DataFrame,
+    per_target: pd.DataFrame,
+    method_metrics: pd.DataFrame,
+    pairwise: pd.DataFrame,
+    source_shift: pd.DataFrame,
+    top_k: int,
+    ties: pd.DataFrame | None = None,
+) -> str:
+    source_counts = (
+        features["candidate_source"].value_counts().rename_axis("source").reset_index(name="count")
+    )
+    lines = [
+        f"# Ensemble Evaluation: {dataset_name}",
+        "",
+        "## Scope",
+        "",
+        f"- Candidates root: `{candidates_root}`",
+        f"- Targets: `{features['target_id'].nunique()}`",
+        f"- Candidates: `{len(features)}`",
+        f"- Targets with native labels: "
+        f"`{features.loc[features['has_native'], 'target_id'].nunique()}`",
+        f"- Top-k: `{top_k}`",
+        f"- Metric caveat: {METRIC_CAVEAT}",
+        "",
+        "## Candidate Sources",
+        "",
+        source_counts.to_markdown(index=False),
+        "",
+    ]
+    if method_metrics.empty:
+        lines.extend(
+            [
+                "## Evaluation Status",
+                "",
+                "No native structures were found inside the target folders, so this run "
+                "only produced manifest/features/scores.",
+                "To compute regret and oracle metrics, add `native.pdb` per target or pass "
+                "`--native-map`.",
+                "",
+            ]
+        )
+        return "\n".join(lines)
+
+    lines.extend(
+        [
+            "## Method Metrics",
+            "",
+            method_metrics.to_markdown(index=False),
+            "",
+            "## Score Ties",
+            "",
+            "A high `tied_fraction` means the mode's top-k is mostly decided by "
+            "tie-breaking rather than by the score, so its metrics below are not "
+            "evidence of ranking skill.",
+            "",
+            ties.to_markdown(index=False) if ties is not None else "_not computed_",
+            "",
+            "## Pairwise Ranking Accuracy",
+            "",
+            pairwise.to_markdown(index=False),
+            "",
+            "## Generator / Source-Aware Summary",
+            "",
+            source_shift.to_markdown(index=False),
+            "",
+            "## Per-Target Metrics",
+            "",
+            per_target.to_markdown(index=False),
+            "",
+            "## Interpretation",
+            "",
+            "This is an evaluation harness, not a state-of-the-art model claim. It measures "
+            "whether simple scoring modes can recover the oracle candidate under the "
+            "available candidate distribution. The number that matters is "
+            "`oracle_hit_rate`; a high `mean_best_of_k_tm_like` with a zero hit rate means "
+            "the pool is weak, not that the ranker works.",
+            "",
+        ]
+    )
+    return "\n".join(lines)

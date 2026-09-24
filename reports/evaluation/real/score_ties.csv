@@ -1,0 +1,5 @@
+method,candidates,distinct_scores,tied_fraction
+low_clash,1367,489,0.6422823701536211
+contact,1367,1263,0.07607900512070227
+hybrid,1367,1367,0.0
+compact,1367,1367,0.0

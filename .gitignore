@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+
+# Large regenerable benchmark data.
+# Everything under data/casp15_rna/ except native_map.csv is rebuilt by:
+#   python -m riborank.cli download-casp15-predictions
+#   python -m riborank.cli download-casp15-natives
+data/casp15_rna/candidates/
+data/casp15_rna/downloads/
+data/casp15_rna/natives/
+
+# Vendored upstream checkout, not a dependency of this codebase.
+# See docs/VENDORED.md for how to obtain it.
+RhoFold/
+RhoFold_git_internal_objects/
+
+# Discovery engine working directories
+discovery_runs/
+*.sqlite
