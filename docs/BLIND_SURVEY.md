@@ -87,6 +87,52 @@ beat, and it says plainly what is missing: **a policy for choosing which
 analysis would explain an anomaly**. Arm A succeeds only because it runs
 everything, which does not scale to a real corpus and is not judgement.
 
+## Discovery is a rate, not an event
+
+The most useful thing Anthropic published about ART is not 949 agents or 210
+million tokens. It is that they re-ran the same campaign ten more times and
+**no rerun read the DNA upstream of the enzyme; all ten missed the array**.
+
+That makes the discovery roughly **1 in 11**, and it reframes the whole problem.
+A discovery engine is not a function that returns a finding — it is a process
+with a rate, and one successful run says almost nothing about that rate.
+
+`sde.benchmarks.rate` measures ours the same way, with a Wilson interval
+(the normal approximation collapses to a point at zero successes and would imply
+certainty this data cannot support). Configuration: one planted locus among 201,
+criterion = planted locus in the top 10, corpus varied per run.
+
+| arm | discovery rate | 95% interval | requested the decisive analysis |
+|---|---:|---|---:|
+| A — full sweep | **9/11 = 0.82** | [0.52, 0.95] | 1.00 |
+| B — budgeted agent | **6/11 = 0.55** | [0.28, 0.79] | **0.55** |
+| *reference: Anthropic ART* | *1/11 = 0.09* | *[0.02, 0.38]* | — |
+
+Two things in this table matter.
+
+**The misses are not near-misses.** Ranks are bimodal: 1, or 23–65. The engine
+either sees the locus immediately or loses it entirely. There is no gradual
+degradation, which means a threshold-tuning exercise would not help.
+
+**Arm B's failures line up exactly with its tool choices.** Every run that
+missed also scored `decisive 0/1` — it never requested the repeat analysis. Every
+run that found it had requested it. The ranking is not the bottleneck; the
+decision about what to measure is.
+
+### Our rate is higher than theirs, and that is not good news
+
+0.82 and 0.55 against 0.09 does **not** mean this engine is better than the one
+that found ART. It means this benchmark is far easier:
+
+- the corpus is synthetic and the planted signal is cleaner than a real locus
+- 201 loci, not 1.9 billion protein clusters
+- the loci are already filtered to be RT-associated — the step that makes the
+  real problem hard has been done for us
+
+`DiscoveryRate.render()` prints this warning automatically whenever a rate sits
+clear of the published reference, and a test asserts the wording, because a
+number above the reference should prompt a harder benchmark rather than a claim.
+
 ## What is still untested
 
 No model is connected in this repository, so the question the benchmark exists

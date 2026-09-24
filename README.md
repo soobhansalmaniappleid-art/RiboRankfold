@@ -214,6 +214,11 @@ These are real and unhidden:
   oracle group collapses it to zero and a shuffled-group control reaches 0.3 by
   chance. It was a group-ID shortcut, not structural signal. That audit is the
   best work in this repository and its conclusion stands.
+- **Discovery is measured as a rate, and ours is not comparable to anyone's.**
+  Anthropic re-ran the ART campaign ten more times and all ten missed the array
+  (1 in 11). Measured the same way, this engine scores 0.82 (full sweep) and
+  0.55 (budgeted agent) — which reflects an easier benchmark, not a better
+  engine, and the harness says so.
 - **The selective agent has not been tested, and the baseline for it fails.**
   On the blind survey, an agent given a budget too small to run everything
   scores 0% top-20 recall and never requests the decisive analysis. Running
