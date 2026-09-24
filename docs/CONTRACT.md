@@ -94,3 +94,32 @@ twenty understates the requirement by about half.
 that exist, what improvement would have to be true before this benchmark could
 show it? For CASP15 today — 10 targets, 20 comparisons — the answer is **+0.45**.
 Nothing smaller than that can be demonstrated here, no matter how good it is.
+
+## Splits hold out whole targets
+
+`riborank/splits.py` builds folds that group by target, and `check_leakage`
+refuses any split that shares a group between train and test.
+
+A candidate-level split is the standard way to get an encouraging number from a
+reranker that has learned nothing. Candidates for one target are near-copies of
+each other, so putting some in train and others in test lets a model recognise
+the target instead of judging the structure. On CASP15 a random 1000/355
+candidate split shares **all ten** targets across both sides; `check_leakage`
+names them and raises.
+
+Where homologous targets exist, use `family_level_folds`. Holding out one
+member of a family while training on another is the same failure one level up.
+`assign_families` raises on an unmapped target by default rather than treating
+it as a singleton, because a silent singleton is how a homologue gets split.
+
+Two refusals are deliberate:
+
+- A fold with an empty test side raises. It would otherwise report the training
+  score, which reads as an excellent result.
+- Requesting more folds than there are groups raises, rather than producing
+  folds that cannot test anything. If every target is one family, a
+  family-level split correctly refuses to exist.
+
+These are unused so far: there is no learned reranker in this repository yet,
+and at n=10 there could not usefully be one. They are here so that when a model
+does arrive, the split it is judged on is not the thing that has to be trusted.

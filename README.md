@@ -149,6 +149,7 @@ riborank/           evaluation harness
   scoring.py          five baseline modes, incl. size-plausibility
   ranking.py          regret, pairwise accuracy, ties, vs-random, power
   contract.py         the evaluation contract every benchmark must satisfy
+  splits.py           target- and family-level folds, with leakage checks
   usalign.py          official US-align TM-score
   report.py           markdown rendering
 
