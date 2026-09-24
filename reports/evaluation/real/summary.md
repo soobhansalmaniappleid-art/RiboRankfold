@@ -23,8 +23,8 @@ Read this first. Each mode is compared with picking candidates at random from th
 | method       | verdict      |   best_of_5 |   random_low |   random_high |   mean_percentile_of_pick |     hit@1 |    hit@5 |   hit@10 |   hit@25 |
 |:-------------|:-------------|------------:|-------------:|--------------:|--------------------------:|----------:|---------:|---------:|---------:|
 | hybrid       | below random |    0.222304 |      0.35534 |       0.47949 |                   30.4461 | 0         | 0.075    | 0.325    | 1        |
-| contact      | below random |    0.174517 |      0.35534 |       0.47949 |                   28.1373 | 0         | 0        | 0.125    | 1        |
-| low_clash    | above random |    0.576129 |      0.35534 |       0.47949 |                   66.4755 | 0         | 0.45     | 0.825    | 1        |
+| contact      | below random |    0.174517 |      0.35534 |       0.47949 |                   28.3946 | 0         | 0        | 0.125    | 1        |
+| low_clash    | above random |    0.618405 |      0.35534 |       0.47949 |                   65.5725 | 0.0760843 | 0.479092 | 0.867867 | 1        |
 | compact      | below random |    0.190835 |      0.35534 |       0.47949 |                   27.2549 | 0         | 0.025    | 0.2      | 1        |
 | plausibility | above random |    0.515576 |      0.35534 |       0.47949 |                   54.5074 | 0         | 0.35     | 0.75     | 1        |
 | random       | reference    |    0.41867  |      0.35534 |       0.47949 |                   50      | 0.0298958 | 0.149479 | 0.298958 | 0.728571 |

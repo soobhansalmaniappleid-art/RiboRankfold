@@ -2,6 +2,12 @@
 
 ## 2026-09-24 — the `low_clash` baseline was a tie-breaking artifact
 
+> **Partly superseded.** The diagnosis below (95.8% of scores tied, so the
+> reported number came from the sort order) is correct. The claim that
+> `low_clash` "falls from best to worst" is **not**: 0.039 was a second
+> tie-break artifact. See the third entry, which computes the tie-aware value
+> (0.147, the same as random selection).
+
 ### What was claimed
 
 Every evaluation report in this repository reported `low_clash` as the strongest
@@ -64,6 +70,9 @@ ranker. The contradiction was the tie artifact showing through.
   `invariant_ensemble` at 0.108) in fact beat the corrected baseline of 0.039 by
   a wide margin. **This correction is favourable to those results**, but they
   must be regenerated before the new numbers are quoted.
+  *Superseded:* the right yardstick is random selection (0.139 best-of-5,
+  95% interval 0.083–0.204). Against that, 0.106 and 0.108 are within random,
+  not above it.
 - It does **not** rescue the headline conclusion. `oracle_hit_rate` remains 0.0
   for all four baselines on CASP15. The rankers still do not work.
 
@@ -143,3 +152,84 @@ must stay near chance (0.1).
 
 A tie-break is part of the model whenever ties are common. It has to be chosen
 to carry no information, and "deterministic" doesn't guarantee that.
+
+## 2026-09-24 — any single tie-break is arbitrary; metrics are now tie-aware
+
+### What was wrong with the first two fixes
+
+Both earlier fixes chose *one* ordering for tied candidates. When 96% of scores
+tie, that choice decides the result. The same `low_clash` score on CASP15 has
+been reported as:
+
+| tie-break | best-of-5 |
+|---|---:|
+| unspecified pandas order (original reports) | 0.116 |
+| `candidate_id` A→Z (first fix) | 0.039 |
+| SHA-256 of `candidate_id` (second fix) | 0.201 |
+
+None of these values says anything about the score. It only fixes an order
+between *distinct* values, and every order within a tied group is equally
+justified.
+
+### Fix
+
+`riborank.ranking.tie_aware_pick` computes each pick statistic as its
+expectation over every ordering of tied candidates, exactly:
+
+- **best-of-k:** the groups wholly inside the top k contribute their maximum.
+  The group that straddles the cut contributes the exact expected maximum of a
+  random m-subset of it.
+- **hit@k:** 1 if the best candidate is in a group wholly inside the top k,
+  `m / group size` if it is in the straddling group, otherwise 0.
+- **percentile of pick:** the mean over the top-scoring group.
+
+Random selection is the special case where every candidate ties, so it goes
+through the same code. Tests check that:
+
+- results match brute-force enumeration of every valid ordering,
+- a fully tied mode scores exactly the same as random,
+- renaming every candidate leaves every statistic unchanged.
+
+`pick_diagnostics.csv`, the first table in each report, uses this. The
+older `oracle_hit_rate` in `method_metrics.csv` still uses the single hash
+ordering; read it together with `score_ties.csv`.
+
+### What is now true on CASP15
+
+| mode | best-of-5 | verdict | pick percentile | hit@25 |
+|---|---:|---|---:|---:|
+| random (exact) | 0.139 | reference (95%: 0.083–0.204) | 49.8 | 0.181 |
+| `low_clash` | 0.147 | within random | 49.8 | 0.203 |
+| `plausibility` | 0.097 | within random | **56.9** | **0.000** |
+| `contact` | 0.062 | **below random** | 40.2 | 0.500 |
+| `compact` | 0.060 | **below random** | 41.0 | 0.300 |
+| `hybrid` | 0.059 | **below random** | 43.5 | 0.500 |
+
+- `low_clash` does not rank on CASP15. It is indistinguishable from random.
+- `hybrid`, `contact` and `compact` are genuinely worse than random at the
+  top. They barely tie, so no tie-break changed them. Their pick is a collapsed
+  structure (on R1138, 720 nt with Rg 14.3 Å against a pool median of 62.6 Å).
+- `plausibility` fixes the collapse. Its top pick is the best of any mode, but
+  it never puts the best candidate in the top 25, while random does 18% of the
+  time. It moves the typical pick up and the best one down.
+- No mode beats random selection on CASP15.
+
+On the synthetic `real` benchmark, `low_clash` (0.618) and `plausibility`
+(0.516) beat random (0.419). Those decoys are perturbations of the native,
+and filtering out visibly broken ones is enough to help. That doesn't carry
+over to real prediction pools.
+
+### A negative result, recorded so it is not retried blindly
+
+Hypothesis: `plausibility` misses the best candidate because its size target
+is fitted on the candidate pools, which are mostly poor predictions. Test:
+fit the size law on the 45 native chains in `data/real` instead. Those are
+different RNAs, so no CASP15 information is used.
+
+Result: worse. Best-of-5 fell to 0.060, below random. The native chains are
+10–94 nt, so the law is extrapolated far past its data for CASP15 targets of
+up to 720 nt. The best CASP15 candidates are also slightly more compact than
+the typical candidate under either law (mean log(Rg / expected) −0.09 vs 0.00
+under the pool law). The right size target seems to lie between "typical
+prediction" and "collapsed". A size law fitted on long native RNAs would be
+needed to test this properly. The shipped mode keeps the pool-fitted law.

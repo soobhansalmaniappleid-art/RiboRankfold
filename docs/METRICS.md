@@ -100,6 +100,11 @@ from the same pools. It is the first section of every generated report.
 | `best_of_k` | mean quality of the best candidate in the top k | exact, from the order statistics |
 | `verdict` | `best_of_k` against the 95% interval of random selection | — |
 
+Every statistic in this table is **tie-aware**: it is averaged over every
+ordering of tied candidates, exactly, so no tie-break can change it (see
+`riborank.ranking.tie_aware_pick` and docs/CORRECTIONS.md). Random selection
+is the special case where every candidate ties.
+
 The expected best of `k` random draws is computed exactly. With the pool sorted
 ascending, the i-th value is the maximum of a random k-subset with probability
 `C(i-1, k-1) / C(n, k)`. A test checks this against brute-force enumeration of
@@ -107,7 +112,7 @@ every subset. The interval comes from seeded resampling and is used only for the
 verdict.
 
 Until this table existed, no report here said what random selection would
-score. On CASP15 most modes are below it.
+score. On CASP15 three of the five modes are below it, and none is above it.
 
 ## `oracle_hit_rate` is the headline
 

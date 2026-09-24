@@ -290,6 +290,99 @@ def _percentile_within(values: np.ndarray, value: float) -> float:
     return 100.0 * float((values < value).sum()) / (n - 1)
 
 
+def _expected_max_with_floor(boundary: np.ndarray, m: int, floor: float) -> float:
+    """E[max(floor, max of a random m-subset of ``boundary``)], exactly."""
+    ordered = np.sort(boundary)
+    g = len(ordered)
+    total = math.comb(g, m)
+    weights = np.array([math.comb(i - 1, m - 1) for i in range(1, g + 1)], dtype=float)
+    return float((weights * np.maximum(ordered, floor)).sum() / total)
+
+
+def tie_aware_pick(
+    scores: np.ndarray,
+    quality: np.ndarray,
+    oracle_index: int,
+    hit_ks: tuple[int, ...],
+    top_k: int,
+) -> dict[str, float]:
+    """Pick statistics averaged over every ordering of tied candidates.
+
+    A scoring mode only defines an order *between* distinct scores. Inside a
+    tied group any order is equally justified, so the honest value of a metric
+    is its expectation over all of them. This removes the tie-break from the
+    result entirely: a fully tied mode scores exactly what random selection
+    scores, whatever the candidates are called.
+    """
+    scores = np.asarray(scores, dtype=float)
+    quality = np.asarray(quality, dtype=float)
+    levels = np.unique(scores)[::-1]  # best score first
+    groups = [np.flatnonzero(scores == level) for level in levels]
+
+    def cut(k: int) -> tuple[list[np.ndarray], np.ndarray | None, int]:
+        """Groups wholly inside the top k, and the partially included group."""
+        full, remaining = [], k
+        for members in groups:
+            if remaining <= 0:
+                break
+            if len(members) <= remaining:
+                full.append(members)
+                remaining -= len(members)
+            else:
+                return full, members, remaining
+        return full, None, 0
+
+    top = groups[0]
+    percentile = float(np.mean([_percentile_within(quality, quality[i]) for i in top]))
+
+    full, boundary, m = cut(top_k)
+    floor = max((quality[members].max() for members in full), default=-np.inf)
+    if boundary is not None and m > 0:
+        best = _expected_max_with_floor(quality[boundary], m, floor)
+    else:
+        best = float(floor)
+
+    hits = {}
+    for k in hit_ks:
+        full, boundary, m = cut(k)
+        if any(oracle_index in members for members in full):
+            hits[k] = 1.0
+        elif boundary is not None and oracle_index in boundary:
+            hits[k] = m / len(boundary)
+        else:
+            hits[k] = 0.0
+    return {"percentile": percentile, "best": best, **{f"hit@{k}": v for k, v in hits.items()}}
+
+
+def _summarise_picks(
+    groups: list[tuple[str, pd.DataFrame]],
+    score_column: str | None,
+    top_k: int,
+    hit_ks: tuple[int, ...],
+    best_col: str,
+) -> dict[str, float]:
+    """Mean tie-aware pick statistics across targets. ``None`` means random."""
+    per_target = []
+    for _, group in groups:
+        oracle_id = _sort_by_oracle(group, "tm_like").iloc[0].candidate_id
+        oracle_index = int(np.flatnonzero(group["candidate_id"].to_numpy() == oracle_id)[0])
+        scores = (
+            np.zeros(len(group)) if score_column is None
+            else pd.to_numeric(group[score_column], errors="coerce").fillna(-np.inf).to_numpy()
+        )
+        per_target.append(
+            tie_aware_pick(scores, group["true_tm_like"].to_numpy(), oracle_index,
+                           hit_ks, top_k)
+        )
+    frame = pd.DataFrame(per_target)
+    out = {
+        "mean_percentile_of_pick": float(frame["percentile"].mean()),
+        best_col: float(frame["best"].mean()),
+    }
+    out.update({f"hit@{k}": float(frame[f"hit@{k}"].mean()) for k in hit_ks})
+    return out
+
+
 def pick_diagnostics(
     features: pd.DataFrame,
     top_k: int = 5,
@@ -298,6 +391,9 @@ def pick_diagnostics(
     seed: int = 0,
 ) -> pd.DataFrame:
     """Score every mode against random selection on the same pools.
+
+    All statistics are averaged over every ordering of tied candidates (see
+    ``tie_aware_pick``), so no tie-break can move them.
 
     Columns:
 
@@ -320,46 +416,14 @@ def pick_diagnostics(
     for score_column in SCORE_COLUMNS:
         if score_column not in labeled.columns:
             continue
-        percentiles, best_of_k = [], []
-        hits = {k: [] for k in hit_ks}
-        for _, group in groups:
-            ranked = rank_by_score(group, score_column)
-            values = ranked["true_tm_like"].to_numpy()
-            percentiles.append(_percentile_within(values, values[0]))
-            best_of_k.append(float(values[:top_k].max()))
-            oracle = _sort_by_oracle(group, "tm_like").iloc[0].candidate_id
-            order = list(ranked["candidate_id"])
-            for k in hit_ks:
-                hits[k].append(oracle in order[:k])
-        row = {
-            "method": method_name(score_column),
-            "mean_percentile_of_pick": float(np.nanmean(percentiles)),
-            best_col: float(np.mean(best_of_k)),
-        }
-        row.update({f"hit@{k}": float(np.mean(hits[k])) for k in hit_ks})
-        rows.append(row)
+        rows.append(
+            {"method": method_name(score_column),
+             **_summarise_picks(groups, score_column, top_k, hit_ks, best_col)}
+        )
 
-    # Exact random expectations.
-    random_row = {
-        "method": "random",
-        "mean_percentile_of_pick": float(
-            np.nanmean(
-                [
-                    np.mean([_percentile_within(g["true_tm_like"].to_numpy(), v)
-                             for v in g["true_tm_like"].to_numpy()])
-                    for _, g in groups
-                ]
-            )
-        ),
-        best_col: float(
-            np.mean([expected_random_best_of_k(g["true_tm_like"].to_numpy(), top_k)
-                     for _, g in groups])
-        ),
-    }
-    random_row.update(
-        {f"hit@{k}": float(np.mean([min(k, len(g)) / len(g) for _, g in groups]))
-         for k in hit_ks}
-    )
+    # Random selection is exactly a mode that ties every candidate.
+    random_row = {"method": "random",
+                  **_summarise_picks(groups, None, top_k, hit_ks, best_col)}
 
     # Seeded interval for the random mean best-of-k across targets.
     rng = np.random.default_rng(seed)

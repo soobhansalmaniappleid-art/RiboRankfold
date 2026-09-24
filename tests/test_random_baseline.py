@@ -136,3 +136,53 @@ def test_tie_break_does_not_follow_candidate_names():
     )
     # Alphabetical tie-breaking would give 1.0 here; chance is 0.1.
     assert hit1 < 0.3
+
+
+def _brute_force_over_tie_orders(scores, quality, oracle, k):
+    """Average top-k statistics over every order consistent with the scores."""
+    scores, quality = np.asarray(scores, float), np.asarray(quality, float)
+    results = []
+    for order in itertools.permutations(range(len(scores))):
+        ranked = list(order)
+        if any(scores[a] < scores[b] for a, b in zip(ranked, ranked[1:], strict=False)):
+            continue  # not a valid ranking under these scores
+        results.append((quality[ranked[:k]].max(), oracle in ranked[:k]))
+    best, hit = zip(*results, strict=True)
+    return float(np.mean(best)), float(np.mean(hit))
+
+
+@pytest.mark.parametrize("k", [1, 2, 3, 4])
+def test_tie_aware_pick_matches_brute_force(k):
+    from riborank.ranking import tie_aware_pick
+
+    scores = [0.9, 0.5, 0.5, 0.5, 0.1, 0.1]
+    quality = [0.2, 0.8, 0.3, 0.6, 0.95, 0.1]
+    oracle = 4
+    expected_best, expected_hit = _brute_force_over_tie_orders(scores, quality, oracle, k)
+    result = tie_aware_pick(np.array(scores), np.array(quality), oracle, (k,), k)
+    assert result["best"] == pytest.approx(expected_best)
+    assert result[f"hit@{k}"] == pytest.approx(expected_hit)
+
+
+def test_a_fully_tied_mode_scores_exactly_like_random():
+    frame = multi_target_frame()
+    frame["score_low_clash"] = 0.0
+    diagnostics = diagnostics_for(frame)
+    columns = ["best_of_5", "mean_percentile_of_pick", "hit@1", "hit@5", "hit@10", "hit@25"]
+    pd.testing.assert_series_equal(
+        diagnostics.loc["low_clash", columns].astype(float),
+        diagnostics.loc["random", columns].astype(float),
+        check_names=False,
+    )
+
+
+def test_diagnostics_do_not_depend_on_candidate_names():
+    frame = multi_target_frame()
+    frame["score_low_clash"] = np.round(frame["score_low_clash"], 0)  # heavy ties
+    renamed = frame.copy()
+    renamed["candidate_id"] = "zz_" + renamed["candidate_id"].str[::-1]
+    columns = ["best_of_5", "mean_percentile_of_pick", "hit@1", "hit@5", "hit@10", "hit@25"]
+    pd.testing.assert_frame_equal(
+        pick_diagnostics(frame, draws=200)[columns],
+        pick_diagnostics(renamed, draws=200)[columns],
+    )

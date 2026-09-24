@@ -11,23 +11,35 @@ Two things live in this repository:
 
 ## Status, stated plainly
 
-**The rankers do not work yet.** On CASP15, `oracle_hit_rate` is **0.0** for all
-four baseline scoring modes: none of them ever places the best available
-candidate in the top 5, across all 10 targets. Best pairwise accuracy is 0.657.
+**No scoring mode here beats picking candidates at random on real predictions.**
 
-This is a harness that measures honestly, with an architecture attached. It is
-not a competitive structure-ranking method, and nothing here should be quoted as
-one.
+On CASP15 (10 targets, ~139 candidates each), measured tie-aware against the
+exact random expectation:
 
-See [docs/CORRECTIONS.md](docs/CORRECTIONS.md) — the previously reported "best
-baseline" was an artifact of unstable tie-breaking, and the correction inverts
-the ranking of the baselines.
+| mode | best-of-5 | vs random (0.139; 95%: 0.083–0.204) | top-1 pick percentile |
+|---|---:|---|---:|
+| `plausibility` | 0.097 | within | **56.9** |
+| `low_clash` | 0.147 | within (it is random: 96% of scores tie) | 49.8 |
+| `contact` | 0.062 | **below** | 40.2 |
+| `compact` | 0.060 | **below** | 41.0 |
+| `hybrid` | 0.059 | **below** | 43.5 |
+
+No mode ever ranks the best candidate first. The features carry real but
+weak signal: pairwise ordering accuracy is 0.61–0.66, against 0.5 for chance.
+But the original modes reward compactness without limit, so their top pick
+is a collapsed structure. `plausibility` removes that failure. It gives the
+best typical pick of any mode but does not find the best candidate.
+
+This is an evaluation harness that measures honestly, plus a discovery
+architecture. It is not a competitive structure-ranking method. See
+[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for three successive corrections
+to how results were measured here; the second and third correct the earlier fixes.
 
 ## Install
 
 ```bash
 pip install -e ".[dev,ml]"
-pytest                      # 116 tests
+pytest                      # 143 tests
 ```
 
 Requires Python 3.11+.
@@ -71,12 +83,15 @@ Synthetic data, so it demonstrates the mechanism rather than a result.
 
 In this order:
 
-1. **`score_ties.csv`** — the fraction of candidates each mode assigns an
+1. **`pick_diagnostics.csv`** — every mode against random selection from the
+   same pools, tie-aware. If a mode is not above random, nothing else in the
+   report matters.
+2. **`score_ties.csv`** — the fraction of candidates each mode assigns an
    identical score. A mode that ties on most of its input is not ranking it; its
    top-k is decided by the tie-break. On CASP15, `low_clash` ties on **95.8%**.
-2. **`oracle_hit_rate`** in `method_metrics.csv` — the fraction of targets where
+3. **`oracle_hit_rate`** in `method_metrics.csv` — the fraction of targets where
    the genuinely best candidate is retrieved. This isolates ranking skill.
-3. **`mean_best_of_k_tm_like`** — measures the candidate pool as much as the
+4. **`mean_best_of_k_tm_like`** — measures the candidate pool as much as the
    method. A weak pool caps it no matter how good the ranker is.
 
 `tm_like` is an internal statistic, **not** official US-align TM-score. Do not
@@ -90,8 +105,8 @@ riborank/           evaluation harness
   structure.py        PDB reading, representative-atom traces
   geometry.py         geometric features, RMSD, tm_like, contact maps
   pipeline.py         manifest -> features -> native-derived labels
-  scoring.py          four baseline scoring modes
-  ranking.py          regret, pairwise accuracy, tie diagnostics
+  scoring.py          five baseline modes, incl. size-plausibility
+  ranking.py          regret, pairwise accuracy, ties, tie-aware vs-random
   report.py           markdown rendering
 
 discovery/          staged discovery funnel  (docs/DISCOVERY.md)
@@ -103,7 +118,7 @@ discovery/          staged discovery funnel  (docs/DISCOVERY.md)
   demo.py             end-to-end run on synthetic data
 
 scripts/            CLI entry points
-tests/              116 tests, no network required
+tests/              143 tests, no network required
 reports/            generated evaluation artifacts
 docs/               METRICS, CORRECTIONS, DISCOVERY, VENDORED
 ```
