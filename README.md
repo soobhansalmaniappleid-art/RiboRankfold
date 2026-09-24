@@ -70,7 +70,7 @@ were measured here; three of them corrected my own earlier fixes.
 
 ```bash
 pip install -e ".[dev,ml]"
-pytest                      # 288 tests
+pytest                      # 310 tests
 ```
 
 Requires Python 3.11+.
@@ -179,12 +179,15 @@ sde/                Scientific Discovery Engine  (docs/ENGINE.md)
   adversary.py        four challenges that try to destroy the claim
   report.py           report generated from the event log alone
   tools/builtin.py    adapters over discovery/ and riborank/
+  investigators.py    baseline policies; the floor a model must beat
+  benchmarks/         the blind survey (docs/BLIND_SURVEY.md)
   demo.py             end-to-end run on synthetic data
 
 scripts/            CLI entry points
-tests/              288 tests, mostly offline
+tests/              310 tests, mostly offline
 reports/            generated evaluation artifacts
-docs/               CONTRACT, METRICS, CORRECTIONS, DISCOVERY, ENGINE, VENDORED
+docs/               CONTRACT, METRICS, CORRECTIONS, DISCOVERY, ENGINE,
+                    BLIND_SURVEY, VENDORED
 ```
 
 ## Known gaps
@@ -211,6 +214,12 @@ These are real and unhidden:
   oracle group collapses it to zero and a shuffled-group control reaches 0.3 by
   chance. It was a group-ID shortcut, not structural signal. That audit is the
   best work in this repository and its conclusion stands.
+- **The selective agent has not been tested, and the baseline for it fails.**
+  On the blind survey, an agent given a budget too small to run everything
+  scores 0% top-20 recall and never requests the decisive analysis. Running
+  everything (the deterministic sweep) reaches 0.77 top-10 recall against 0.15
+  random, but that does not scale and is not judgement. See
+  [docs/BLIND_SURVEY.md](docs/BLIND_SURVEY.md).
 - **The engine cannot find candidates, only investigate ones it is handed.**
   `hmmsearch` and `mmseqs_cluster` are declared but not installed, and they are
   the step that makes a billion-sequence space tractable. Neither `discovery/`

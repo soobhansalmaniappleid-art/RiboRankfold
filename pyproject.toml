@@ -25,7 +25,15 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["riborank", "discovery", "discovery.features", "discovery.agents", "sde", "sde.tools"]
+packages = [
+    "riborank",
+    "discovery",
+    "discovery.features",
+    "discovery.agents",
+    "sde",
+    "sde.tools",
+    "sde.benchmarks",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
