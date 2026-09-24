@@ -46,25 +46,40 @@ grid. At the useful k values (k<=25) every mode is within noise of random.
 The more useful finding is that **the benchmark is underpowered**. A paired
 sign-flip test on n targets cannot go below p = 2^-n, so at n=10 almost nothing
 can reach significance. A test in this repo shows that on 5 targets even a
-*perfect* ranker fails to survive correction. `targets_needed` estimates that
-detecting a +0.15 hit-rate gain at k=25 requires **~42 targets**; CASP15 RNA
-provides 10.
+*perfect* ranker fails to survive correction. `detectable_effect` puts it concretely: with 10 targets and the
+20-comparison grid actually run, the smallest hit-rate gain this benchmark
+could ever resolve is **+0.45**. `power_table` (written to every report) sizes
+the alternative — detecting +0.15 under the same correction needs **90**
+targets, not the 42 an uncorrected single test suggests.
 
 So the next step is not another scoring function. It is more labelled targets.
 
 This is an evaluation harness that measures honestly, plus a discovery
 architecture. It is not a competitive structure-ranking method. See
-[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for five corrections to how results
+[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for six corrections to how results
 were measured here; three of them corrected my own earlier fixes.
 
 ## Install
 
 ```bash
 pip install -e ".[dev,ml]"
-pytest                      # 178 tests
+pytest                      # 208 tests
 ```
 
 Requires Python 3.11+.
+
+## The evaluation contract
+
+Every benchmark emits `contract_candidates.csv` and `contract_summary.csv`,
+validated before they are written: each row carries its `label_metric`, its
+`tie_group_size` and its `benchmark_kind`, and the summary stores the random
+reference beside the result. Adding a column ad hoc is rejected. See
+[docs/CONTRACT.md](docs/CONTRACT.md).
+
+`--benchmark-kind` is required and must be one of `prediction_pool`,
+`experimental` or `controlled_decoy`. These are never averaged: on
+`controlled_decoy` data `low_clash` beats random (0.618 vs 0.419), while on the
+real CASP15 pool the same mode is indistinguishable from it.
 
 ## Reproduce the evaluation
 
@@ -78,7 +93,8 @@ python scripts/evaluate_structural_ensemble.py \
     --candidates-root data/casp15_rna/candidates \
     --out-dir reports/evaluation/casp15 \
     --dataset-name casp15 \
-    --native-map data/casp15_rna/native_map.csv
+    --native-map data/casp15_rna/native_map.csv \
+    --benchmark-kind prediction_pool
 
 python scripts/make_evaluation_digest.py \
     --eval-dir reports/evaluation/casp15 \
@@ -90,7 +106,8 @@ A smaller benchmark that needs no download:
 ```bash
 python scripts/evaluate_structural_ensemble.py \
     --candidates-root data/real/candidates \
-    --out-dir reports/evaluation/real --dataset-name real
+    --out-dir reports/evaluation/real --dataset-name real \
+    --no-usalign --benchmark-kind controlled_decoy
 ```
 
 ## Run the discovery demo
@@ -130,7 +147,9 @@ riborank/           evaluation harness
   geometry.py         geometric features, RMSD, tm_like, contact maps
   pipeline.py         manifest -> features -> native-derived labels
   scoring.py          five baseline modes, incl. size-plausibility
-  ranking.py          regret, pairwise accuracy, ties, tie-aware vs-random
+  ranking.py          regret, pairwise accuracy, ties, vs-random, power
+  contract.py         the evaluation contract every benchmark must satisfy
+  usalign.py          official US-align TM-score
   report.py           markdown rendering
 
 discovery/          staged discovery funnel  (docs/DISCOVERY.md)
@@ -142,9 +161,9 @@ discovery/          staged discovery funnel  (docs/DISCOVERY.md)
   demo.py             end-to-end run on synthetic data
 
 scripts/            CLI entry points
-tests/              178 tests, mostly offline
+tests/              208 tests, mostly offline
 reports/            generated evaluation artifacts
-docs/               METRICS, CORRECTIONS, DISCOVERY, VENDORED
+docs/               CONTRACT, METRICS, CORRECTIONS, DISCOVERY, VENDORED
 ```
 
 ## Known gaps
@@ -154,11 +173,14 @@ These are real and unhidden:
 - **`data/real` cannot use the official metric.** It is entirely C4'-only, so
   US-align cannot parse it and it still reports `true_tm_like`. It is synthetic
   anyway and is a wiring check, not evidence.
-- **Ten CASP15 targets, and that is the binding constraint.** `targets_needed`
-  puts the requirement at ~42 for the effect sizes in play. At n=10 a perfect
-  ranker would not clear multiple-comparison correction on a 20-cell grid, so
-  no amount of modelling work can be validated here. More labelled targets are
-  the prerequisite for everything else.
+- **Ten CASP15 targets, and that is the binding constraint.** At n=10 the
+  smallest resolvable gain is +0.45, and a perfect ranker would not clear
+  multiple-comparison correction on a 20-cell grid. No amount of modelling work
+  can be validated here. More labelled targets are the prerequisite for
+  everything else, and they must come as *three separate benchmarks* — real
+  prediction pools, independent experimental structures, and controlled decoys
+  — because averaging those kinds hides exactly the effect `data/real`
+  demonstrates.
 - **Sub-reports are stale.** Everything under
   `reports/evaluation/casp15/*/` was produced by scripts not yet ported onto
   `riborank.ranking`, so they still carry the pre-correction baseline. See the

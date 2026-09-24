@@ -84,6 +84,21 @@ Separate question from ranking: does a mode keep the best candidate inside its t
 
 Surviving: `hybrid`@20, `hybrid`@25, `contact`@20, `contact`@25, `low_clash`@1, `low_clash`@2, `low_clash`@5, `low_clash`@10, `low_clash`@20, `low_clash`@25, `compact`@20, `compact`@25, `plausibility`@10, `plausibility`@20, `plausibility`@25
 
+## Statistical Power
+
+This benchmark has **40** labelled targets. The table below says how many would be needed to detect a given improvement in hit-rate, at the stated power, with the alpha split across the comparisons actually run. No single row is *the* requirement: the answer moves by an order of magnitude across plausible effect sizes, so it is reported whole.
+
+|   baseline |   effect_size |   power |   alpha |   comparisons |   targets_needed |   n_targets_available |
+|-----------:|--------------:|--------:|--------:|--------------:|-----------------:|----------------------:|
+|   0.149479 |          0.05 |     0.8 |    0.05 |            45 |              774 |                    40 |
+|   0.149479 |          0.05 |     0.9 |    0.05 |            45 |              959 |                    40 |
+|   0.149479 |          0.1  |     0.8 |    0.05 |            45 |              194 |                    40 |
+|   0.149479 |          0.1  |     0.9 |    0.05 |            45 |              240 |                    40 |
+|   0.149479 |          0.15 |     0.8 |    0.05 |            45 |               86 |                    40 |
+|   0.149479 |          0.15 |     0.9 |    0.05 |            45 |              107 |                    40 |
+|   0.149479 |          0.2  |     0.8 |    0.05 |            45 |               49 |                    40 |
+|   0.149479 |          0.2  |     0.9 |    0.05 |            45 |               60 |                    40 |
+
 ## Method Metrics
 
 | oracle_type   | method       |   targets |   mean_best_of_k_quality |   mean_best_of_k_multi_metric |   mean_quality_regret |   mean_multi_metric_regret |   mean_rmsd_regret |   oracle_hit_rate |

@@ -100,6 +100,21 @@ Separate question from ranking: does a mode keep the best candidate inside its t
 
 Surviving: `contact`@100
 
+## Statistical Power
+
+This benchmark has **10** labelled targets. The table below says how many would be needed to detect a given improvement in hit-rate, at the stated power, with the alpha split across the comparisons actually run. No single row is *the* requirement: the answer moves by an order of magnitude across plausible effect sizes, so it is reported whole.
+
+|   baseline |   effect_size |   power |   alpha |   comparisons |   targets_needed |   n_targets_available |
+|-----------:|--------------:|--------:|--------:|--------------:|-----------------:|----------------------:|
+|   0.037479 |          0.05 |     0.8 |    0.05 |            45 |              220 |                    10 |
+|   0.037479 |          0.05 |     0.9 |    0.05 |            45 |              272 |                    10 |
+|   0.037479 |          0.1  |     0.8 |    0.05 |            45 |               55 |                    10 |
+|   0.037479 |          0.1  |     0.9 |    0.05 |            45 |               68 |                    10 |
+|   0.037479 |          0.15 |     0.8 |    0.05 |            45 |               25 |                    10 |
+|   0.037479 |          0.15 |     0.9 |    0.05 |            45 |               31 |                    10 |
+|   0.037479 |          0.2  |     0.8 |    0.05 |            45 |               14 |                    10 |
+|   0.037479 |          0.2  |     0.9 |    0.05 |            45 |               17 |                    10 |
+
 ## Method Metrics
 
 | oracle_type   | method       |   targets |   mean_best_of_k_quality |   mean_best_of_k_multi_metric |   mean_quality_regret |   mean_multi_metric_regret |   mean_rmsd_regret |   oracle_hit_rate |

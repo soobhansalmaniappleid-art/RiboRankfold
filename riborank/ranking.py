@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import math
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
@@ -559,22 +560,88 @@ def retrieval_curve(
 
 
 def targets_needed(
-    delta: float, baseline: float, power: float = 0.8, alpha: float = 0.05
+    delta: float,
+    baseline: float,
+    power: float = 0.8,
+    alpha: float = 0.05,
+    comparisons: int = 1,
 ) -> int:
-    """Rough number of targets needed to detect ``delta`` in a hit-rate.
+    """Targets needed to detect a ``delta`` shift in a hit-rate.
 
-    A normal approximation for a one-sample proportion shift, intended for
-    sizing a benchmark rather than for reporting a result.
+    Normal approximation for a one-sample proportion shift, for *sizing* a
+    benchmark rather than reporting a result. ``comparisons`` applies a
+    Bonferroni split of ``alpha``, because a benchmark is never sized for one
+    isolated test: a grid of modes against k values is what actually gets run.
+
+    No number from this belongs hard-coded in prose. It is a function of an
+    assumed effect size, and the assumption is the fragile part.
     """
-    if not 0.0 < baseline < 1.0 or delta <= 0.0:
-        raise ValueError("baseline must be in (0, 1) and delta positive")
-    from math import ceil
+    if not 0.0 < baseline < 1.0:
+        raise ValueError(f"baseline must be in (0, 1), got {baseline}")
+    if delta <= 0.0:
+        raise ValueError(f"delta must be positive, got {delta}")
+    if not 0.0 < power < 1.0:
+        raise ValueError(f"power must be in (0, 1), got {power}")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+    if comparisons < 1:
+        raise ValueError(f"comparisons must be >= 1, got {comparisons}")
 
-    # Inverse normal CDF at the two points we need, without scipy.
-    z = {0.8: 0.8416, 0.9: 1.2816, 0.95: 1.6449}
-    z_power = z.get(round(power, 2))
-    z_alpha = z.get(round(1 - alpha, 2))
-    if z_power is None or z_alpha is None:
-        raise ValueError("power must be 0.8/0.9/0.95 and alpha 0.05/0.1/0.2")
+    normal = NormalDist()
+    z_alpha = normal.inv_cdf(1.0 - alpha / comparisons)  # one-sided
+    z_power = normal.inv_cdf(power)
     variance = baseline * (1.0 - baseline)
-    return int(ceil(((z_alpha + z_power) ** 2) * variance / (delta**2))) or 1
+    return max(1, int(math.ceil(((z_alpha + z_power) ** 2) * variance / (delta**2))))
+
+
+def power_table(
+    baseline: float,
+    effect_sizes: tuple[float, ...] = (0.05, 0.10, 0.15, 0.20),
+    powers: tuple[float, ...] = (0.8, 0.9),
+    alpha: float = 0.05,
+    comparisons: int = 1,
+) -> pd.DataFrame:
+    """How many targets each assumed improvement would need.
+
+    Reading one row of this as "the" requirement is the mistake it exists to
+    prevent: the answer moves by an order of magnitude across plausible effect
+    sizes, so the table is reported whole.
+    """
+    rows = [
+        {
+            "baseline": baseline,
+            "effect_size": effect,
+            "power": power,
+            "alpha": alpha,
+            "comparisons": comparisons,
+            "targets_needed": targets_needed(
+                effect, baseline, power=power, alpha=alpha, comparisons=comparisons
+            ),
+        }
+        for effect in effect_sizes
+        for power in powers
+    ]
+    return pd.DataFrame(rows)
+
+
+def detectable_effect(
+    n_targets: int,
+    baseline: float,
+    power: float = 0.8,
+    alpha: float = 0.05,
+    comparisons: int = 1,
+) -> float:
+    """The smallest hit-rate gain a benchmark of this size could detect.
+
+    The inverse question, and usually the more useful one: given the targets
+    that exist, what improvement would have to be true before this benchmark
+    could show it?
+    """
+    if n_targets < 1:
+        raise ValueError(f"n_targets must be >= 1, got {n_targets}")
+    if not 0.0 < baseline < 1.0:
+        raise ValueError(f"baseline must be in (0, 1), got {baseline}")
+    normal = NormalDist()
+    z_alpha = normal.inv_cdf(1.0 - alpha / max(1, comparisons))
+    z_power = normal.inv_cdf(power)
+    return float((z_alpha + z_power) * math.sqrt(baseline * (1.0 - baseline) / n_targets))

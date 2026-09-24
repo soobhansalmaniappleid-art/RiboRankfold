@@ -335,11 +335,56 @@ reach significance however good it is.
 makes this concrete: on 5 targets, a **perfect** ranker fails to survive
 correction.
 
-`riborank.ranking.targets_needed` sizes the fix. Detecting a +0.15 hit-rate gain
-at k = 25 over a 0.187 baseline, at 80% power, needs **≈42 targets**. CASP15 RNA
-provides 10.
+`riborank.ranking.targets_needed` sizes the fix.
+
+> **Corrected below.** The "≈42 targets" figure first written here assumed a
+> *single* test. The grid actually run is 20 comparisons, and with alpha split
+> across them the same effect needs **90** targets. See the next entry.
 
 So the next step for RiboRank is not another scoring function. It is more
 labelled targets — CASP16 RNA, RNA-Puzzles, or decoy sets built from PDB
 structures — because at n = 10 the benchmark cannot distinguish a good reranker
 from a lucky one.
+
+## 2026-09-24 — "42 targets" was my own hard-coded number, and it was wrong
+
+### What was claimed
+
+The previous entry, and the README, said the benchmark needs "≈42 targets".
+
+### Why it was wrong
+
+That figure came from `targets_needed(0.15, 0.187)` with default arguments,
+which sizes **one** isolated test. The analysis that produced the finding swept
+5 modes against 4 values of k — 20 comparisons — and the significance of those
+was judged with Holm correction. Sizing for one test and testing with twenty is
+inconsistent, and it understates the requirement by roughly half:
+
+| comparisons | targets for +0.15 at 80% power, baseline 0.187 |
+|---|---:|
+| 1 | 42 |
+| 20 | **90** |
+
+The number was also frozen into prose, which is precisely the failure this
+repository keeps repeating: a number computed once, written into a document, and
+then quoted after the thing it described has changed.
+
+### Fix
+
+- `targets_needed` takes `comparisons` and applies a Bonferroni split of alpha.
+  It accepts any power and alpha via `statistics.NormalDist` instead of a
+  three-entry lookup table that raised on anything else.
+- `power_table` returns the whole grid of assumed effect sizes against required
+  targets. Reports print the table, never one row.
+- `detectable_effect` answers the inverse and more useful question. For CASP15
+  as it stands — 10 targets, 20 comparisons — the smallest detectable hit-rate
+  gain is **+0.45**. That is why `contact@50` at +0.425 sat just under the line:
+  it was at the edge of what this benchmark could ever resolve.
+- No required-target count is hard-coded in any document. The tables in reports
+  are generated.
+
+### Lesson
+
+An effect size is an assumption, so every sample-size number is conditional on
+it. Publishing one figure without the assumption attached turns a conditional
+estimate into a fact, and the fact then outlives the assumption.

@@ -32,6 +32,7 @@ def render_ensemble_report(
     ties: pd.DataFrame | None = None,
     versus_random: pd.DataFrame | None = None,
     curve: pd.DataFrame | None = None,
+    power: pd.DataFrame | None = None,
 ) -> str:
     source_counts = (
         features["candidate_source"].value_counts().rename_axis("source").reset_index(name="count")
@@ -122,6 +123,24 @@ def render_ensemble_report(
                     else "Surviving: "
                     + ", ".join(f"`{r.method}`@{r.k}" for r in survivors.itertuples())
                 ),
+                "",
+            ]
+        )
+
+    if power is not None and not power.empty:
+        available = int(power["n_targets_available"].iloc[0])
+        lines.extend(
+            [
+                "## Statistical Power",
+                "",
+                f"This benchmark has **{available}** labelled targets. The table below "
+                "says how many would be needed to detect a given improvement in "
+                "hit-rate, at the stated power, with the alpha split across the "
+                "comparisons actually run. No single row is *the* requirement: the "
+                "answer moves by an order of magnitude across plausible effect sizes, "
+                "so it is reported whole.",
+                "",
+                power.to_markdown(index=False),
                 "",
             ]
         )

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from riborank.contract import BenchmarkSpec, build_candidate_table, build_summary_table
 from riborank.pipeline import (
     add_labels,
     apply_labels,
@@ -20,6 +21,7 @@ from riborank.ranking import (
     evaluate_per_target,
     pairwise_ranking_accuracy,
     pick_diagnostics,
+    power_table,
     retrieval_curve,
     source_shift_summary,
     summarize_methods,
@@ -69,6 +71,16 @@ def parse_args() -> argparse.Namespace:
         help="Force the ground-truth metric instead of preferring official TM-score.",
     )
     parser.add_argument("--usalign-workers", type=int, default=8)
+    parser.add_argument(
+        "--benchmark-kind",
+        choices=["prediction_pool", "experimental", "controlled_decoy"],
+        required=True,
+        help=(
+            "What this benchmark is. Real prediction pools, independent experimental "
+            "structures and controlled decoys answer different questions and must not "
+            "be averaged together."
+        ),
+    )
     args = parser.parse_args()
     if args.top_k < 1:
         raise SystemExit("--top-k must be positive")
@@ -114,7 +126,7 @@ def main() -> None:
         )
 
     empty = pd.DataFrame()
-    per_target = method_metrics = pairwise = source_shift = ties = versus_random = curve = empty
+    per_target = method_metrics = pairwise = source_shift = ties = versus_random = curve = power = empty
     if bool(features["has_native"].any()):
         per_target = evaluate_per_target(features, top_k=args.top_k)
         method_metrics = summarize_methods(per_target)
@@ -130,6 +142,21 @@ def main() -> None:
         ties.to_csv(args.out_dir / "score_ties.csv", index=False)
         versus_random.to_csv(args.out_dir / "pick_diagnostics.csv", index=False)
         curve.to_csv(args.out_dir / "retrieval_curve.csv", index=False)
+        spec = BenchmarkSpec(name=dataset_name, kind=args.benchmark_kind)
+        contract_candidates = build_candidate_table(features, spec, top_k=args.top_k)
+        contract_summary = build_summary_table(
+            features, spec, contract_candidates, versus_random, pairwise, top_k=args.top_k
+        )
+        contract_candidates.to_csv(args.out_dir / "contract_candidates.csv", index=False)
+        contract_summary.to_csv(args.out_dir / "contract_summary.csv", index=False)
+        power = power_table(
+            baseline=float(versus_random.loc[versus_random["method"] == "random", "hit@5"].iloc[0])
+            if "hit@5" in versus_random.columns
+            else 0.2,
+            comparisons=max(1, int(len(curve))),
+        )
+        power["n_targets_available"] = contract_summary["n_targets"].iloc[0]
+        power.to_csv(args.out_dir / "power_table.csv", index=False)
 
     report = render_ensemble_report(
         dataset_name=dataset_name,
@@ -145,6 +172,7 @@ def main() -> None:
         ties=ties,
         versus_random=versus_random,
         curve=curve,
+        power=power,
     )
     (args.out_dir / "summary.md").write_text(report, encoding="utf-8")
     print(f"Wrote ensemble evaluation artifacts to {args.out_dir}")
