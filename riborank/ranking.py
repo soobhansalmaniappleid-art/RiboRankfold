@@ -33,8 +33,8 @@ from riborank.scoring import SCORE_COLUMNS, method_name
 # A hash of the ID is reproducible and uncorrelated with how files are named.
 TIE_KEY = "_tie_key"
 
-TM_SORT = (["true_tm_like", "true_rmsd", TIE_KEY], [False, True, True])
-MULTI_SORT = (["multi_metric_quality", "true_tm_like", TIE_KEY], [False, False, True])
+TM_SORT = (["true_quality", "true_rmsd_used", TIE_KEY], [False, True, True])
+MULTI_SORT = (["multi_metric_quality", "true_quality", TIE_KEY], [False, False, True])
 
 
 def tie_key(candidate_ids: pd.Series) -> pd.Series:
@@ -72,7 +72,7 @@ def tie_diagnostics(features: pd.DataFrame) -> pd.DataFrame:
     A high ``tied_fraction`` means the mode's top-k is largely arbitrary and its
     headline metrics should not be read as ranking skill.
     """
-    labeled = features.dropna(subset=["true_tm_like"])
+    labeled = features.dropna(subset=["true_quality"])
     rows = []
     for score_column in SCORE_COLUMNS:
         if score_column not in labeled.columns:
@@ -93,7 +93,7 @@ def tie_diagnostics(features: pd.DataFrame) -> pd.DataFrame:
 def evaluate_per_target(features: pd.DataFrame, top_k: int = 5) -> pd.DataFrame:
     """Per-target regret for every (scoring mode, oracle definition) pair."""
     rows: list[dict[str, object]] = []
-    labeled = features.dropna(subset=["true_tm_like", "true_rmsd", "multi_metric_quality"])
+    labeled = features.dropna(subset=["true_quality", "multi_metric_quality"])
     for target_id, group in labeled.groupby("target_id"):
         oracles = {
             oracle_type: _sort_by_oracle(group, oracle_type).iloc[0]
@@ -112,26 +112,26 @@ def evaluate_per_target(features: pd.DataFrame, top_k: int = 5) -> pd.DataFrame:
                         "oracle_type": oracle_type,
                         "num_candidates": int(len(group)),
                         "oracle_candidate": oracle.candidate_id,
-                        "oracle_tm_like": float(oracle.true_tm_like),
-                        "oracle_rmsd": float(oracle.true_rmsd),
+                        "oracle_quality": float(oracle.true_quality),
+                        "oracle_rmsd": float(oracle.true_rmsd_used),
                         "oracle_contact_f1": float(oracle.contact_map_f1),
                         "oracle_multi_metric_quality": float(oracle.multi_metric_quality),
                         "selected_top1_candidate": selected_top1.candidate_id,
-                        "selected_top1_tm_like": float(selected_top1.true_tm_like),
-                        "selected_top1_rmsd": float(selected_top1.true_rmsd),
+                        "selected_top1_quality": float(selected_top1.true_quality),
+                        "selected_top1_rmsd": float(selected_top1.true_rmsd_used),
                         "selected_top1_contact_f1": float(selected_top1.contact_map_f1),
                         "selected_top1_multi_metric_quality": float(
                             selected_top1.multi_metric_quality
                         ),
                         f"selected_best_in_top{top_k}_candidate": selected_best.candidate_id,
-                        f"best_of_{top_k}_tm_like": float(selected_best.true_tm_like),
-                        f"best_of_{top_k}_rmsd": float(selected_best.true_rmsd),
+                        f"best_of_{top_k}_quality": float(selected_best.true_quality),
+                        f"best_of_{top_k}_rmsd": float(selected_best.true_rmsd_used),
                         f"best_of_{top_k}_contact_f1": float(selected_best.contact_map_f1),
                         f"best_of_{top_k}_multi_metric_quality": float(
                             selected_best.multi_metric_quality
                         ),
-                        "tm_like_regret": float(oracle.true_tm_like - selected_best.true_tm_like),
-                        "rmsd_regret": float(selected_best.true_rmsd - oracle.true_rmsd),
+                        "quality_regret": float(oracle.true_quality - selected_best.true_quality),
+                        "rmsd_regret": float(selected_best.true_rmsd_used - oracle.true_rmsd_used),
                         "multi_metric_regret": float(
                             oracle.multi_metric_quality - selected_best.multi_metric_quality
                         ),
@@ -147,7 +147,7 @@ def summarize_methods(per_target: pd.DataFrame) -> pd.DataFrame:
     topk_column = next(
         column
         for column in per_target.columns
-        if column.startswith("best_of_") and column.endswith("_tm_like")
+        if column.startswith("best_of_") and column.endswith("_quality")
     )
     topk_multi_column = next(
         column
@@ -161,15 +161,15 @@ def summarize_methods(per_target: pd.DataFrame) -> pd.DataFrame:
         per_target.groupby(["oracle_type", "method"])
         .agg(
             targets=("target_id", "nunique"),
-            mean_best_of_k_tm_like=(topk_column, "mean"),
+            mean_best_of_k_quality=(topk_column, "mean"),
             mean_best_of_k_multi_metric=(topk_multi_column, "mean"),
-            mean_tm_like_regret=("tm_like_regret", "mean"),
+            mean_quality_regret=("quality_regret", "mean"),
             mean_multi_metric_regret=("multi_metric_regret", "mean"),
             mean_rmsd_regret=("rmsd_regret", "mean"),
             oracle_hit_rate=(hit_column, "mean"),
         )
         .reset_index()
-        .sort_values("mean_best_of_k_tm_like", ascending=False)
+        .sort_values("mean_best_of_k_quality", ascending=False)
     )
 
 
@@ -179,7 +179,7 @@ def pairwise_ranking_accuracy(features: pd.DataFrame) -> pd.DataFrame:
     Ties in either the true label or the score are excluded from the denominator.
     """
     rows = []
-    labeled = features.dropna(subset=["true_tm_like"])
+    labeled = features.dropna(subset=["true_quality"])
     for target_id, group in labeled.groupby("target_id"):
         pairs = list(itertools.combinations(group.index, 2))
         for score_column in SCORE_COLUMNS:
@@ -188,9 +188,9 @@ def pairwise_ranking_accuracy(features: pd.DataFrame) -> pd.DataFrame:
             for left_idx, right_idx in pairs:
                 left = group.loc[left_idx]
                 right = group.loc[right_idx]
-                if left.true_tm_like == right.true_tm_like:
+                if left.true_quality == right.true_quality:
                     continue
-                truth = math.copysign(1.0, left.true_tm_like - right.true_tm_like)
+                truth = math.copysign(1.0, left.true_quality - right.true_quality)
                 pred = (
                     math.copysign(1.0, left[score_column] - right[score_column])
                     if left[score_column] != right[score_column]
@@ -228,7 +228,7 @@ def source_shift_summary(features: pd.DataFrame, top_k: int = 5) -> pd.DataFrame
     With true multi-generator inputs this exposes whether a method generalizes
     beyond the dominant source.
     """
-    labeled = features.dropna(subset=["true_tm_like"])
+    labeled = features.dropna(subset=["true_quality"])
     if labeled.empty:
         return pd.DataFrame()
     rows = []
@@ -371,7 +371,7 @@ def _summarise_picks(
             else pd.to_numeric(group[score_column], errors="coerce").fillna(-np.inf).to_numpy()
         )
         per_target.append(
-            tie_aware_pick(scores, group["true_tm_like"].to_numpy(), oracle_index,
+            tie_aware_pick(scores, group["true_quality"].to_numpy(), oracle_index,
                            hit_ks, top_k)
         )
     frame = pd.DataFrame(per_target)
@@ -406,7 +406,7 @@ def pick_diagnostics(
 
     A final ``random`` row carries the exact random expectations.
     """
-    labeled = features.dropna(subset=["true_tm_like"])
+    labeled = features.dropna(subset=["true_quality"])
     if labeled.empty:
         return pd.DataFrame()
     groups = [(target_id, group) for target_id, group in labeled.groupby("target_id")]
@@ -427,7 +427,7 @@ def pick_diagnostics(
 
     # Seeded interval for the random mean best-of-k across targets.
     rng = np.random.default_rng(seed)
-    pools = [g["true_tm_like"].to_numpy() for _, g in groups]
+    pools = [g["true_quality"].to_numpy() for _, g in groups]
     samples = np.empty(draws)
     for draw in range(draws):
         samples[draw] = np.mean(

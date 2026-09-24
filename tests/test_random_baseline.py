@@ -22,8 +22,8 @@ def multi_target_frame(targets: int = 8, per_target: int = 30, seed: int = 0) ->
                     "candidate_id": [f"T{t}_c{i}" for i in range(per_target)],
                     "candidate_source": ["casp"] * per_target,
                     "has_native": [True] * per_target,
-                    "true_tm_like": quality,
-                    "true_rmsd": 20.0 * (1.0 - quality),
+                    "true_quality": quality,
+                    "true_rmsd_used": 20.0 * (1.0 - quality),
                     "contact_map_f1": quality,
                     "multi_metric_quality": quality,
                     "num_residues": [50 + 10 * t] * per_target,
@@ -68,7 +68,7 @@ def diagnostics_for(frame: pd.DataFrame) -> pd.DataFrame:
 
 def test_a_perfect_ranker_is_above_random():
     frame = multi_target_frame()
-    frame["score_hybrid"] = frame["true_tm_like"]
+    frame["score_hybrid"] = frame["true_quality"]
     diagnostics = diagnostics_for(frame)
     assert diagnostics.loc["hybrid", "verdict"] == "above random"
     assert diagnostics.loc["hybrid", "mean_percentile_of_pick"] == pytest.approx(100.0)
@@ -77,7 +77,7 @@ def test_a_perfect_ranker_is_above_random():
 
 def test_an_inverted_ranker_is_below_random():
     frame = multi_target_frame()
-    frame["score_hybrid"] = -frame["true_tm_like"]
+    frame["score_hybrid"] = -frame["true_quality"]
     diagnostics = diagnostics_for(frame)
     assert diagnostics.loc["hybrid", "verdict"] == "below random"
     assert diagnostics.loc["hybrid", "mean_percentile_of_pick"] == pytest.approx(0.0)
@@ -107,7 +107,7 @@ def test_diagnostics_are_reproducible():
 
 def test_unlabeled_input_gives_an_empty_frame():
     frame = multi_target_frame()
-    frame["true_tm_like"] = np.nan
+    frame["true_quality"] = np.nan
     assert pick_diagnostics(frame).empty
 
 
@@ -121,8 +121,8 @@ def test_tie_break_does_not_follow_candidate_names():
                 {
                     "target_id": [f"T{t}"] * 10,
                     "candidate_id": [f"{chr(97 + i)}_T{t}" for i in range(10)],
-                    "true_tm_like": quality,
-                    "true_rmsd": 1.0 - quality,
+                    "true_quality": quality,
+                    "true_rmsd_used": 1.0 - quality,
                     "score_low_clash": 0.0,  # every candidate tied
                 }
             )
@@ -131,7 +131,7 @@ def test_tie_break_does_not_follow_candidate_names():
     from riborank.ranking import rank_by_score
 
     hit1 = np.mean(
-        [rank_by_score(g, "score_low_clash").iloc[0]["true_tm_like"] == 1.0
+        [rank_by_score(g, "score_low_clash").iloc[0]["true_quality"] == 1.0
          for _, g in frame.groupby("target_id")]
     )
     # Alphabetical tie-breaking would give 1.0 here; chance is 0.1.

@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from riborank.pipeline import add_labels, build_features, build_manifest, read_native_map
+from riborank.pipeline import (
+    add_labels,
+    apply_labels,
+    build_features,
+    build_manifest,
+    label_coverage,
+    read_native_map,
+)
 from riborank.ranking import (
     evaluate_per_target,
     pairwise_ranking_accuracy,
@@ -19,6 +26,7 @@ from riborank.ranking import (
 )
 from riborank.report import render_ensemble_report
 from riborank.scoring import add_scores
+from riborank.usalign import UsalignError, find_usalign, score_frame
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,6 +52,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--include-native-candidate", action="store_true")
+    parser.add_argument(
+        "--usalign",
+        default=None,
+        help=(
+            "Path to the US-align binary. Defaults to $RIBORANK_USALIGN or PATH. "
+            "Use --no-usalign to fall back to the internal tm_like approximation."
+        ),
+    )
+    parser.add_argument("--no-usalign", action="store_true")
+    parser.add_argument(
+        "--label-metric",
+        choices=["usalign_tm", "true_tm_like"],
+        default=None,
+        help="Force the ground-truth metric instead of preferring official TM-score.",
+    )
+    parser.add_argument("--usalign-workers", type=int, default=8)
     args = parser.parse_args()
     if args.top_k < 1:
         raise SystemExit("--top-k must be positive")
@@ -64,9 +88,29 @@ def main() -> None:
     if manifest.empty:
         raise SystemExit(f"No candidate PDB files found under {args.candidates_root}")
 
-    features = add_scores(add_labels(build_features(manifest)))
+    features = add_labels(build_features(manifest))
+    if not args.no_usalign:
+        try:
+            binary = find_usalign(args.usalign)
+        except UsalignError as error:
+            if args.usalign or args.label_metric == "usalign_tm":
+                raise SystemExit(str(error)) from error
+            print(f"WARNING: {error}\nFalling back to the internal tm_like metric.")
+        else:
+            print(f"Scoring with US-align at {binary}")
+            features = score_frame(features, binary, workers=args.usalign_workers)
+    features = add_scores(apply_labels(features, prefer=args.label_metric))
+    label_metric = features["label_metric"].iloc[0]
+    print(f"Ground-truth metric: {label_metric}")
     manifest.to_csv(args.out_dir / "manifest.csv", index=False)
     features.to_csv(args.out_dir / "features.csv", index=False)
+    coverage = label_coverage(features)
+    coverage.to_csv(args.out_dir / "label_coverage.csv", index=False)
+    if int(coverage["unlabelled"].sum()):
+        print(
+            f"WARNING: {int(coverage['unlabelled'].sum())} of {len(features)} candidates "
+            f"could not be labelled with {label_metric}; see label_coverage.csv"
+        )
 
     empty = pd.DataFrame()
     per_target = method_metrics = pairwise = source_shift = ties = versus_random = empty
@@ -93,6 +137,8 @@ def main() -> None:
         pairwise=pairwise,
         source_shift=source_shift,
         top_k=args.top_k,
+        label_metric=label_metric,
+        coverage=coverage,
         ties=ties,
         versus_random=versus_random,
     )

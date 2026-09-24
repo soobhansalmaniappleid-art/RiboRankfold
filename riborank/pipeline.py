@@ -90,3 +90,76 @@ def add_labels(features: pd.DataFrame) -> pd.DataFrame:
         row["aligned_residue_count"] = aligned
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+#: Label metrics, best first. ``usalign_tm`` is the official TM-score and is
+#: preferred whenever it has been computed; ``true_tm_like`` is the internal
+#: approximation kept only as a fallback (docs/METRICS.md).
+LABEL_METRICS = ("usalign_tm", "true_tm_like")
+LABEL_RMSD = {"usalign_tm": "usalign_rmsd", "true_tm_like": "true_rmsd"}
+
+
+def choose_label_metric(features: pd.DataFrame, prefer: str | None = None) -> str:
+    """Pick which measured metric acts as ground truth for ranking.
+
+    Preferring a metric that was never computed is an error, not a silent
+    downgrade: a run asked for official TM-score must not quietly report
+    internal numbers instead.
+    """
+    if prefer is not None:
+        if prefer not in LABEL_METRICS:
+            raise ValueError(f"unknown label metric {prefer!r}; expected one of {LABEL_METRICS}")
+        if prefer not in features.columns or not features[prefer].notna().any():
+            raise ValueError(f"label metric {prefer!r} requested but no values were computed")
+        return prefer
+    for metric in LABEL_METRICS:
+        if metric in features.columns and features[metric].notna().any():
+            return metric
+    raise ValueError("no label metric available; run add_labels first")
+
+
+def apply_labels(features: pd.DataFrame, prefer: str | None = None) -> pd.DataFrame:
+    """Set ``true_quality``/``true_rmsd_used`` from the chosen metric.
+
+    Ranking reads ``true_quality`` and never the raw columns, so switching
+    between official and internal metrics changes one function, not the
+    evaluation code.
+    """
+    metric = choose_label_metric(features, prefer)
+    frame = features.copy()
+    frame["label_metric"] = metric
+    frame["true_quality"] = pd.to_numeric(frame[metric], errors="coerce")
+    rmsd_column = LABEL_RMSD[metric]
+    frame["true_rmsd_used"] = (
+        pd.to_numeric(frame[rmsd_column], errors="coerce")
+        if rmsd_column in frame.columns
+        else np.nan
+    )
+    return frame
+
+
+def label_coverage(features: pd.DataFrame) -> pd.DataFrame:
+    """Per-target count of candidates that actually received a label.
+
+    Exclusions are never invisible. US-align represents an RNA residue by C3',
+    so a candidate deposited as a C4'-only backbone trace cannot be scored with
+    it. Scoring those with ``-atom C4'`` instead would mix representative atoms
+    within one benchmark and break comparability with published CASP numbers,
+    so they are reported as unscored rather than patched.
+    """
+    metric = choose_label_metric(features)
+    rows = []
+    for target_id, group in features.groupby("target_id"):
+        scored = int(group[metric].notna().sum())
+        total = int(len(group))
+        rows.append(
+            {
+                "target_id": target_id,
+                "candidates": total,
+                "labelled": scored,
+                "unlabelled": total - scored,
+                "coverage": scored / total if total else np.nan,
+            }
+        )
+    frame = pd.DataFrame(rows)
+    return frame.sort_values(by="coverage", ascending=True).reset_index(drop=True)

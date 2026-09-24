@@ -1,4 +1,4 @@
-oracle_type,method,targets,mean_best_of_k_tm_like,mean_best_of_k_multi_metric,mean_tm_like_regret,mean_multi_metric_regret,mean_rmsd_regret,oracle_hit_rate
+oracle_type,method,targets,mean_best_of_k_quality,mean_best_of_k_multi_metric,mean_quality_regret,mean_multi_metric_regret,mean_rmsd_regret,oracle_hit_rate
 tm_like,low_clash,40,0.5761293049354943,0.586190191199101,0.15156440948721508,0.10219369665749496,0.34462821631316004,0.45
 multi_metric,low_clash,40,0.5749729924046123,0.5867925189695863,0.1527207220180971,0.10159136888700959,0.350656545635711,0.45
 tm_like,plausibility,40,0.515576418656596,0.5404206012943318,0.21211729576611354,0.14796328656226415,1.1164402271326996,0.35

@@ -5,7 +5,7 @@
 - Targets with native labels: `10`
 - Candidate structures: `1392`
 - Candidate source: official CASP15 RNA prediction tarballs
-- Metric status: internal chain/window-aware `TM-like`, not official US-align TM-score
+- Ground-truth metric: `usalign_tm`
 
 ## Versus Random Selection
 
@@ -13,30 +13,30 @@ Read this first. `random` is the exact expectation of picking at random from the
 
 | method       | verdict       |   best_of_5 |   random_low |   random_high |   mean_percentile_of_pick |      hit@1 |     hit@5 |    hit@10 |   hit@25 |
 |:-------------|:--------------|------------:|-------------:|--------------:|--------------------------:|-----------:|----------:|----------:|---------:|
-| hybrid       | below random  |   0.0588776 |    0.0833348 |      0.204287 |                   43.4501 | 0          | 0         | 0.1       | 0.5      |
-| contact      | below random  |   0.0617388 |    0.0833348 |      0.204287 |                   40.2342 | 0          | 0         | 0.1       | 0.5      |
-| low_clash    | within random |   0.147256  |    0.0833348 |      0.204287 |                   49.8131 | 0.00811413 | 0.0405706 | 0.0811413 | 0.202853 |
-| compact      | below random  |   0.0595278 |    0.0833348 |      0.204287 |                   40.9695 | 0          | 0         | 0.1       | 0.3      |
-| plausibility | within random |   0.0970164 |    0.0833348 |      0.204287 |                   56.8755 | 0          | 0         | 0         | 0        |
-| random       | reference     |   0.139263  |    0.0833348 |      0.204287 |                   49.8053 | 0.00723682 | 0.0361841 | 0.0723682 | 0.180921 |
+| hybrid       | below random  |    0.31218  |     0.354116 |      0.489626 |                   15.8831 | 0          | 0         | 0.1       | 0.2      |
+| contact      | below random  |    0.31699  |     0.354116 |      0.489626 |                   13.2168 | 0          | 0         | 0.1       | 0.3      |
+| low_clash    | within random |    0.430263 |     0.354116 |      0.489626 |                   51.0395 | 0.00652027 | 0.0326014 | 0.0652027 | 0.163007 |
+| compact      | below random  |    0.27478  |     0.354116 |      0.489626 |                   15.7281 | 0          | 0         | 0         | 0.2      |
+| plausibility | within random |    0.39423  |     0.354116 |      0.489626 |                   57.1217 | 0.02       | 0.1       | 0.1       | 0.1      |
+| random       | reference     |    0.421963 |     0.354116 |      0.489626 |                   49.7807 | 0.00749579 | 0.037479  | 0.0749579 | 0.187395 |
 
 Worse than random selection: `hybrid`, `contact`, `compact`.
 No mode beats random selection.
 
 ## Top-5 Recovery
 
-| oracle_type   | method       |   targets |   mean_best_of_k_tm_like |   mean_best_of_k_multi_metric |   mean_tm_like_regret |   mean_rmsd_regret |   oracle_hit_rate |
+| oracle_type   | method       |   targets |   mean_best_of_k_quality |   mean_best_of_k_multi_metric |   mean_quality_regret |   mean_rmsd_regret |   oracle_hit_rate |
 |:--------------|:-------------|----------:|-------------------------:|------------------------------:|----------------------:|-------------------:|------------------:|
-| tm_like       | low_clash    |        10 |                0.200988  |                      0.347714 |              0.123824 |            4.72361 |               0.1 |
-| multi_metric  | low_clash    |        10 |                0.200988  |                      0.347714 |              0.123577 |            4.7188  |               0.1 |
-| tm_like       | plausibility |        10 |                0.0970164 |                      0.261282 |              0.227796 |           12.2843  |               0   |
-| multi_metric  | plausibility |        10 |                0.0963707 |                      0.265281 |              0.228195 |           12.583   |               0   |
-| tm_like       | contact      |        10 |                0.0617388 |                      0.177502 |              0.263073 |           13.5455  |               0   |
-| tm_like       | compact      |        10 |                0.0595278 |                      0.184376 |              0.265284 |           15.6744  |               0   |
-| tm_like       | hybrid       |        10 |                0.0588776 |                      0.177393 |              0.265935 |           14.8912  |               0   |
-| multi_metric  | compact      |        10 |                0.0576583 |                      0.187576 |              0.266907 |           16.2713  |               0   |
-| multi_metric  | contact      |        10 |                0.0567832 |                      0.184825 |              0.267782 |           15.4875  |               0   |
-| multi_metric  | hybrid       |        10 |                0.0546918 |                      0.187177 |              0.269874 |           16.6273  |               0   |
+| tm_like       | low_clash    |        10 |                  0.47413 |                      0.346046 |               0.13766 |              0.318 |               0   |
+| multi_metric  | low_clash    |        10 |                  0.47389 |                      0.347714 |               0.12361 |              0.431 |               0.1 |
+| tm_like       | plausibility |        10 |                  0.39423 |                      0.270387 |               0.21756 |              0.296 |               0.1 |
+| multi_metric  | plausibility |        10 |                  0.38208 |                      0.277901 |               0.21542 |              0.679 |               0   |
+| tm_like       | contact      |        10 |                  0.31699 |                      0.207991 |               0.2948  |              0.822 |               0   |
+| tm_like       | hybrid       |        10 |                  0.31218 |                      0.210542 |               0.29961 |              0.651 |               0   |
+| multi_metric  | contact      |        10 |                  0.30479 |                      0.217621 |               0.29271 |              1.091 |               0   |
+| multi_metric  | hybrid       |        10 |                  0.30017 |                      0.219974 |               0.29733 |              0.953 |               0   |
+| tm_like       | compact      |        10 |                  0.27478 |                      0.17452  |               0.33701 |              0.529 |               0   |
+| multi_metric  | compact      |        10 |                  0.26452 |                      0.187646 |               0.33298 |              0.814 |               0   |
 
 ## Score Ties
 
@@ -44,11 +44,11 @@ Read this before the table above. A scoring mode that assigns the same score to 
 
 | method       |   candidates |   distinct_scores |   tied_fraction |
 |:-------------|-------------:|------------------:|----------------:|
-| low_clash    |         1392 |                58 |        0.958333 |
-| contact      |         1392 |              1174 |        0.156609 |
-| hybrid       |         1392 |              1185 |        0.148707 |
-| compact      |         1392 |              1185 |        0.148707 |
-| plausibility |         1392 |              1189 |        0.145833 |
+| low_clash    |         1355 |                58 |        0.957196 |
+| contact      |         1355 |              1147 |        0.153506 |
+| hybrid       |         1355 |              1156 |        0.146863 |
+| compact      |         1355 |              1156 |        0.146863 |
+| plausibility |         1355 |              1159 |        0.144649 |
 
 Modes whose ordering is mostly ties: `low_clash`. Their metrics are not evidence of ranking skill.
 
@@ -56,70 +56,70 @@ Modes whose ordering is mostly ties: `low_clash`. Their metrics are not evidence
 
 | method       |   targets |   pairwise_comparisons |   mean_pairwise_accuracy |
 |:-------------|----------:|-----------------------:|-------------------------:|
-| compact      |        10 |                  96463 |                0.656632  |
-| hybrid       |        10 |                  96463 |                0.638814  |
-| contact      |        10 |                  96463 |                0.625826  |
-| plausibility |        10 |                  96463 |                0.60552   |
-| low_clash    |        10 |                  96463 |                0.0839897 |
+| plausibility |        10 |                  91957 |                 0.624569 |
+| hybrid       |        10 |                  91957 |                 0.599067 |
+| contact      |        10 |                  91957 |                 0.59109  |
+| compact      |        10 |                  91957 |                 0.578759 |
+| low_clash    |        10 |                  91957 |                 0.107589 |
 
 ## Main Finding
 
-Best top-5 TM-like mode is `low_clash` with mean best-of-5 TM-like `0.200988`. Best pairwise mode is `compact` with mean pairwise accuracy `0.656632`.
+Best top-5 mode is `low_clash` with mean best-of-5 `0.474130`. Best pairwise mode is `plausibility` with mean pairwise accuracy `0.624569`.
 
 ## Per-Target Oracle Miss Summary
 
-| target_id   | method       |   num_candidates | oracle_candidate    |   oracle_tm_like | selected_best_in_top5_candidate   |   best_of_5_tm_like |   tm_like_regret | oracle_in_top5   |
+| target_id   | method       |   num_candidates | oracle_candidate    |   oracle_quality | selected_best_in_top5_candidate   |   best_of_5_quality |   quality_regret | oracle_in_top5   |
 |:------------|:-------------|-----------------:|:--------------------|-----------------:|:----------------------------------|--------------------:|-----------------:|:-----------------|
-| R1107       | hybrid       |              131 | casp15_R1107TS232_1 |        0.317653  | casp15_R1107TS054_4               |           0.11914   |        0.198513  | False            |
-| R1107       | contact      |              131 | casp15_R1107TS232_1 |        0.317653  | casp15_R1107TS054_4               |           0.11914   |        0.198513  | False            |
-| R1107       | low_clash    |              131 | casp15_R1107TS232_1 |        0.317653  | casp15_R1107TS470_1               |           0.167162  |        0.150491  | False            |
-| R1107       | compact      |              131 | casp15_R1107TS232_1 |        0.317653  | casp15_R1107TS125_1               |           0.120924  |        0.196729  | False            |
-| R1107       | plausibility |              131 | casp15_R1107TS232_1 |        0.317653  | casp15_R1107TS392_1               |           0.0304182 |        0.287235  | False            |
-| R1108       | hybrid       |              115 | casp15_R1108TS232_4 |        0.326242  | casp15_R1108TS489_5               |           0.0832001 |        0.243042  | False            |
-| R1108       | contact      |              115 | casp15_R1108TS232_4 |        0.326242  | casp15_R1108TS489_5               |           0.0832001 |        0.243042  | False            |
-| R1108       | low_clash    |              115 | casp15_R1108TS232_4 |        0.326242  | casp15_R1108TS489_1               |           0.257925  |        0.0683167 | False            |
-| R1108       | compact      |              115 | casp15_R1108TS232_4 |        0.326242  | casp15_R1108TS489_5               |           0.0832001 |        0.243042  | False            |
-| R1108       | plausibility |              115 | casp15_R1108TS232_4 |        0.326242  | casp15_R1108TS125_2               |           0.159031  |        0.167211  | False            |
-| R1116       | hybrid       |              145 | casp15_R1116TS285_5 |        0.0808182 | casp15_R1116TS238_2               |           0.052994  |        0.0278242 | False            |
-| R1116       | contact      |              145 | casp15_R1116TS285_5 |        0.0808182 | casp15_R1116TS238_2               |           0.052994  |        0.0278242 | False            |
-| R1116       | low_clash    |              145 | casp15_R1116TS285_5 |        0.0808182 | casp15_R1116TS439_4               |           0.0500368 |        0.0307814 | False            |
-| R1116       | compact      |              145 | casp15_R1116TS285_5 |        0.0808182 | casp15_R1116TS245_5               |           0.0216792 |        0.059139  | False            |
-| R1116       | plausibility |              145 | casp15_R1116TS285_5 |        0.0808182 | casp15_R1116TS235_5               |           0.0568951 |        0.0239231 | False            |
-| R1117       | hybrid       |              153 | casp15_R1117TS232_1 |        0.367808  | casp15_R1117TS238_2               |           0.0997797 |        0.268028  | False            |
-| R1117       | contact      |              153 | casp15_R1117TS232_1 |        0.367808  | casp15_R1117TS238_2               |           0.0997797 |        0.268028  | False            |
-| R1117       | low_clash    |              153 | casp15_R1117TS232_1 |        0.367808  | casp15_R1117TS287_3               |           0.327978  |        0.03983   | False            |
-| R1117       | compact      |              153 | casp15_R1117TS232_1 |        0.367808  | casp15_R1117TS235_1               |           0.103378  |        0.26443   | False            |
-| R1117       | plausibility |              153 | casp15_R1117TS232_1 |        0.367808  | casp15_R1117TS444_4               |           0.0927152 |        0.275093  | False            |
-| R1126       | hybrid       |              140 | casp15_R1126TS232_4 |        0.369332  | casp15_R1126TS470_5               |           0.0342285 |        0.335103  | False            |
-| R1126       | contact      |              140 | casp15_R1126TS232_4 |        0.369332  | casp15_R1126TS238_1               |           0.0467003 |        0.322631  | False            |
-| R1126       | low_clash    |              140 | casp15_R1126TS232_4 |        0.369332  | casp15_R1126TS434_1               |           0.0502032 |        0.319129  | False            |
-| R1126       | compact      |              140 | casp15_R1126TS232_4 |        0.369332  | casp15_R1126TS470_5               |           0.0342285 |        0.335103  | False            |
-| R1126       | plausibility |              140 | casp15_R1126TS232_4 |        0.369332  | casp15_R1126TS119_5               |           0.0361132 |        0.333219  | False            |
-| R1128       | hybrid       |              137 | casp15_R1128TS232_1 |        0.616745  | casp15_R1128TS163_1               |           0.0557753 |        0.560969  | False            |
-| R1128       | contact      |              137 | casp15_R1128TS232_1 |        0.616745  | casp15_R1128TS163_1               |           0.0557753 |        0.560969  | False            |
-| R1128       | low_clash    |              137 | casp15_R1128TS232_1 |        0.616745  | casp15_R1128TS287_1               |           0.408251  |        0.208494  | False            |
-| R1128       | compact      |              137 | casp15_R1128TS232_1 |        0.616745  | casp15_R1128TS163_1               |           0.0557753 |        0.560969  | False            |
-| R1128       | plausibility |              137 | casp15_R1128TS232_1 |        0.616745  | casp15_R1128TS439_1               |           0.0582932 |        0.558451  | False            |
-| R1136       | hybrid       |              158 | casp15_R1136TS232_3 |        0.458915  | casp15_R1136TS238_1               |           0.0344501 |        0.424465  | False            |
-| R1136       | contact      |              158 | casp15_R1136TS232_3 |        0.458915  | casp15_R1136TS238_1               |           0.0344501 |        0.424465  | False            |
-| R1136       | low_clash    |              158 | casp15_R1136TS232_3 |        0.458915  | casp15_R1136TS347_4               |           0.392557  |        0.0663581 | False            |
-| R1136       | compact      |              158 | casp15_R1136TS232_3 |        0.458915  | casp15_R1136TS489_4               |           0.0273229 |        0.431592  | False            |
-| R1136       | plausibility |              158 | casp15_R1136TS232_3 |        0.458915  | casp15_R1136TS232_5               |           0.410283  |        0.0486322 | False            |
-| R1138       | hybrid       |              130 | casp15_R1138TS232_4 |        0.199991  | casp15_R1138TS229_2               |           0.0376324 |        0.162358  | False            |
-| R1138       | contact      |              130 | casp15_R1138TS232_4 |        0.199991  | casp15_R1138TS238_1               |           0.0537724 |        0.146218  | False            |
-| R1138       | low_clash    |              130 | casp15_R1138TS232_4 |        0.199991  | casp15_R1138TS232_4               |           0.199991  |        0         | True             |
-| R1138       | compact      |              130 | casp15_R1138TS232_4 |        0.199991  | casp15_R1138TS229_2               |           0.0376324 |        0.162358  | False            |
-| R1138       | plausibility |              130 | casp15_R1138TS232_4 |        0.199991  | casp15_R1138TS054_4               |           0.0352652 |        0.164726  | False            |
-| R1149       | hybrid       |              138 | casp15_R1149TS128_1 |        0.246788  | casp15_R1149TS235_4               |           0.038251  |        0.208537  | False            |
-| R1149       | contact      |              138 | casp15_R1149TS128_1 |        0.246788  | casp15_R1149TS235_4               |           0.038251  |        0.208537  | False            |
-| R1149       | low_clash    |              138 | casp15_R1149TS128_1 |        0.246788  | casp15_R1149TS470_5               |           0.060214  |        0.186574  | False            |
-| R1149       | compact      |              138 | casp15_R1149TS128_1 |        0.246788  | casp15_R1149TS248_1               |           0.0706909 |        0.176097  | False            |
-| R1149       | plausibility |              138 | casp15_R1149TS128_1 |        0.246788  | casp15_R1149TS287_4               |           0.0639056 |        0.182882  | False            |
-| R1156       | hybrid       |              145 | casp15_R1156TS128_5 |        0.263831  | casp15_R1156TS238_4               |           0.0333249 |        0.230506  | False            |
-| R1156       | contact      |              145 | casp15_R1156TS128_5 |        0.263831  | casp15_R1156TS238_4               |           0.0333249 |        0.230506  | False            |
-| R1156       | low_clash    |              145 | casp15_R1156TS128_5 |        0.263831  | casp15_R1156TS232_3               |           0.0955644 |        0.168266  | False            |
-| R1156       | compact      |              145 | casp15_R1156TS128_5 |        0.263831  | casp15_R1156TS235_5               |           0.0404463 |        0.223384  | False            |
-| R1156       | plausibility |              145 | casp15_R1156TS128_5 |        0.263831  | casp15_R1156TS076_1               |           0.0272447 |        0.236586  | False            |
+| R1107       | hybrid       |              105 | casp15_R1107TS232_1 |           0.5644 | casp15_R1107TS232_5               |              0.4729 |           0.0915 | False            |
+| R1107       | contact      |              105 | casp15_R1107TS232_1 |           0.5644 | casp15_R1107TS232_5               |              0.4729 |           0.0915 | False            |
+| R1107       | low_clash    |              105 | casp15_R1107TS232_1 |           0.5644 | casp15_R1107TS470_1               |              0.3809 |           0.1835 | False            |
+| R1107       | compact      |              105 | casp15_R1107TS232_1 |           0.5644 | casp15_R1107TS054_5               |              0.3958 |           0.1686 | False            |
+| R1107       | plausibility |              105 | casp15_R1107TS232_1 |           0.5644 | casp15_R1107TS470_1               |              0.3809 |           0.1835 | False            |
+| R1108       | hybrid       |              109 | casp15_R1108TS128_3 |           0.5443 | casp15_R1108TS232_5               |              0.5172 |           0.0271 | False            |
+| R1108       | contact      |              109 | casp15_R1108TS128_3 |           0.5443 | casp15_R1108TS232_5               |              0.5172 |           0.0271 | False            |
+| R1108       | low_clash    |              109 | casp15_R1108TS128_3 |           0.5443 | casp15_R1108TS489_1               |              0.4531 |           0.0912 | False            |
+| R1108       | compact      |              109 | casp15_R1108TS128_3 |           0.5443 | casp15_R1108TS470_5               |              0.365  |           0.1793 | False            |
+| R1108       | plausibility |              109 | casp15_R1108TS128_3 |           0.5443 | casp15_R1108TS125_5               |              0.3519 |           0.1924 | False            |
+| R1116       | hybrid       |              145 | casp15_R1116TS285_5 |           0.6676 | casp15_R1116TS238_2               |              0.4442 |           0.2234 | False            |
+| R1116       | contact      |              145 | casp15_R1116TS285_5 |           0.6676 | casp15_R1116TS238_2               |              0.4442 |           0.2234 | False            |
+| R1116       | low_clash    |              145 | casp15_R1116TS285_5 |           0.6676 | casp15_R1116TS439_4               |              0.5999 |           0.0677 | False            |
+| R1116       | compact      |              145 | casp15_R1116TS285_5 |           0.6676 | casp15_R1116TS177_1               |              0.2378 |           0.4298 | False            |
+| R1116       | plausibility |              145 | casp15_R1116TS285_5 |           0.6676 | casp15_R1116TS232_1               |              0.4916 |           0.176  | False            |
+| R1117       | hybrid       |              148 | casp15_R1117TS444_4 |           0.4463 | casp15_R1117TS248_5               |              0.2541 |           0.1922 | False            |
+| R1117       | contact      |              148 | casp15_R1117TS444_4 |           0.4463 | casp15_R1117TS248_5               |              0.2541 |           0.1922 | False            |
+| R1117       | low_clash    |              148 | casp15_R1117TS444_4 |           0.4463 | casp15_R1117TS287_3               |              0.3975 |           0.0488 | False            |
+| R1117       | compact      |              148 | casp15_R1117TS444_4 |           0.4463 | casp15_R1117TS248_5               |              0.2541 |           0.1922 | False            |
+| R1117       | plausibility |              148 | casp15_R1117TS444_4 |           0.4463 | casp15_R1117TS444_4               |              0.4463 |           0      | True             |
+| R1126       | hybrid       |              140 | casp15_R1126TS232_4 |           0.6133 | casp15_R1126TS470_5               |              0.1704 |           0.4429 | False            |
+| R1126       | contact      |              140 | casp15_R1126TS232_4 |           0.6133 | casp15_R1126TS238_2               |              0.239  |           0.3743 | False            |
+| R1126       | low_clash    |              140 | casp15_R1126TS232_4 |           0.6133 | casp15_R1126TS119_2               |              0.2609 |           0.3524 | False            |
+| R1126       | compact      |              140 | casp15_R1126TS232_4 |           0.6133 | casp15_R1126TS470_5               |              0.1704 |           0.4429 | False            |
+| R1126       | plausibility |              140 | casp15_R1126TS232_4 |           0.6133 | casp15_R1126TS128_4               |              0.2874 |           0.3259 | False            |
+| R1128       | hybrid       |              137 | casp15_R1128TS232_1 |           0.7853 | casp15_R1128TS238_1               |              0.2912 |           0.4941 | False            |
+| R1128       | contact      |              137 | casp15_R1128TS232_1 |           0.7853 | casp15_R1128TS238_1               |              0.2912 |           0.4941 | False            |
+| R1128       | low_clash    |              137 | casp15_R1128TS232_1 |           0.7853 | casp15_R1128TS287_1               |              0.6677 |           0.1176 | False            |
+| R1128       | compact      |              137 | casp15_R1128TS232_1 |           0.7853 | casp15_R1128TS229_2               |              0.3483 |           0.437  | False            |
+| R1128       | plausibility |              137 | casp15_R1128TS232_1 |           0.7853 | casp15_R1128TS439_1               |              0.3359 |           0.4494 | False            |
+| R1136       | hybrid       |              158 | casp15_R1136TS232_3 |           0.7477 | casp15_R1136TS238_2               |              0.2028 |           0.5449 | False            |
+| R1136       | contact      |              158 | casp15_R1136TS232_3 |           0.7477 | casp15_R1136TS238_2               |              0.2028 |           0.5449 | False            |
+| R1136       | low_clash    |              158 | casp15_R1136TS232_3 |           0.7477 | casp15_R1136TS347_4               |              0.699  |           0.0487 | False            |
+| R1136       | compact      |              158 | casp15_R1136TS232_3 |           0.7477 | casp15_R1136TS238_2               |              0.2028 |           0.5449 | False            |
+| R1136       | plausibility |              158 | casp15_R1136TS232_3 |           0.7477 | casp15_R1136TS232_5               |              0.7169 |           0.0308 | False            |
+| R1138       | hybrid       |              130 | casp15_R1138TS232_1 |           0.6496 | casp15_R1138TS470_2               |              0.1608 |           0.4888 | False            |
+| R1138       | contact      |              130 | casp15_R1138TS232_1 |           0.6496 | casp15_R1138TS229_2               |              0.1403 |           0.5093 | False            |
+| R1138       | low_clash    |              130 | casp15_R1138TS232_1 |           0.6496 | casp15_R1138TS232_4               |              0.5988 |           0.0508 | False            |
+| R1138       | compact      |              130 | casp15_R1138TS232_1 |           0.6496 | casp15_R1138TS229_2               |              0.1403 |           0.5093 | False            |
+| R1138       | plausibility |              130 | casp15_R1138TS232_1 |           0.6496 | casp15_R1138TS054_4               |              0.2397 |           0.4099 | False            |
+| R1149       | hybrid       |              138 | casp15_R1149TS110_2 |           0.5131 | casp15_R1149TS235_4               |              0.3127 |           0.2004 | False            |
+| R1149       | contact      |              138 | casp15_R1149TS110_2 |           0.5131 | casp15_R1149TS235_4               |              0.3127 |           0.2004 | False            |
+| R1149       | low_clash    |              138 | casp15_R1149TS110_2 |           0.5131 | casp15_R1149TS470_5               |              0.3168 |           0.1963 | False            |
+| R1149       | compact      |              138 | casp15_R1149TS110_2 |           0.5131 | casp15_R1149TS248_1               |              0.3358 |           0.1773 | False            |
+| R1149       | plausibility |              138 | casp15_R1149TS110_2 |           0.5131 | casp15_R1149TS248_2               |              0.3668 |           0.1463 | False            |
+| R1156       | hybrid       |              145 | casp15_R1156TS128_5 |           0.5863 | casp15_R1156TS238_4               |              0.2955 |           0.2908 | False            |
+| R1156       | contact      |              145 | casp15_R1156TS128_5 |           0.5863 | casp15_R1156TS238_4               |              0.2955 |           0.2908 | False            |
+| R1156       | low_clash    |              145 | casp15_R1156TS128_5 |           0.5863 | casp15_R1156TS232_3               |              0.3667 |           0.2196 | False            |
+| R1156       | compact      |              145 | casp15_R1156TS128_5 |           0.5863 | casp15_R1156TS235_5               |              0.2975 |           0.2888 | False            |
+| R1156       | plausibility |              145 | casp15_R1156TS128_5 |           0.5863 | casp15_R1156TS054_5               |              0.3249 |           0.2614 | False            |
 
 ## Next Technical Implication
 

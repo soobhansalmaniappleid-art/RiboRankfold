@@ -1,33 +1,65 @@
 # Metrics: what they are, and what they are not
 
-## `tm_like` is not TM-score
+## Official TM-score is now the default
 
-`riborank.geometry.tm_like` applies the TM-score functional form
+`riborank/usalign.py` runs the official US-align binary and records
+`usalign_tm`, normalised by the native, which is the convention US-align
+recommends and what CASP reports. `riborank.pipeline.apply_labels` copies the
+best available metric into `true_quality`, and all ranking code reads only that
+column. `label_metric` in `features.csv` and every report header says which was
+used. Asking for `usalign_tm` when it was never computed raises, so a run can
+never quietly report internal numbers instead.
+
+The binary is not vendored. Build it once:
+
+```bash
+git clone --depth 1 https://github.com/pylelab/USalign
+cd USalign && make USalign
+export RIBORANK_USALIGN=$PWD/USalign
+```
+
+### How wrong was the internal metric?
+
+`tm_like` applied the TM-score formula to a single global RMSD:
 
 ```
 d0    = max(1.0, 1.24 * (L - 15)^(1/3) - 1.8)
 score = 1 / (1 + (RMSD / d0)^2)
 ```
 
-to a **single global RMSD** produced by Kabsch superposition of the best
-chain/window pair. Real TM-score (US-align, TM-align) optimises an alignment and
-sums a per-residue term:
+Real TM-score optimises an alignment and sums a per-residue term, so it is not
+dominated by the worst-fitting residues. Measured on the 1355 CASP15 candidates
+both metrics could score:
 
-```
-TM = (1/L) * max over alignments of  sum_i 1 / (1 + (d_i / d0)^2)
-```
+- Within-target rank correlation between them is only **rho = 0.69**
+  (per target 0.49–0.88). They are not interchangeable even as an ordering.
+- They disagree about which candidate is best on **4 of 10 targets**.
+- `tm_like` badly understated the pool. On R1116 its best candidate scored
+  0.081; the real TM-score of that target's best is **0.668**.
 
-The two are not the same statistic and do not agree numerically. In particular
-`tm_like` is dominated by the worst-fitting residues, because a single large
-deviation inflates the global RMSD, whereas TM-score down-weights them.
+The last point matters most. Earlier reports concluded the candidate pool was
+nearly worthless, with a typical best-of-pool around 0.3. Under the official
+metric, best-of-pool is 0.45–0.79 and the median candidate is 0.20–0.42. **The
+"weak pool" was largely an artifact of the metric**, and every conclusion that
+rested on it has been regenerated.
 
-**Consequence:** every `tm_like` number in `reports/` is internally comparable
-across candidates and methods in this repository, and is *not* comparable to any
-published CASP TM-score. Do not put these numbers in a table next to CASP
-results.
+### What cannot be scored
 
-Replacing `tm_like` with official US-align output is the single highest-value
-change available to this project. It is not done yet.
+US-align represents an RNA residue by C3'. A structure deposited as a C4'-only
+backbone trace cannot be parsed by it at all; `-atom " C4'"` does not override
+this for nucleic acids (tested). Such candidates are reported as unlabelled in
+`label_coverage.csv` and excluded from every metric, rather than being scored
+with a different representative atom, which would mix metrics inside one
+benchmark and break comparability with published numbers.
+
+- **CASP15:** 1355 of 1392 candidates labelled (97.3%). The 37 exclusions are
+  C4'-only traces in R1107 (26), R1108 (6) and R1117 (5). None of them is its
+  target's best candidate, so no oracle is lost.
+- **`data/real`:** every file, natives included, is a C4'-only trace, so that
+  benchmark **cannot** be scored with the official metric and still reports
+  `true_tm_like`. Its numbers are not comparable with CASP results. It is also
+  synthetic (native plus perturbed decoys), so it is a wiring check, not
+  evidence.
 
 ## `multi_metric_quality`
 

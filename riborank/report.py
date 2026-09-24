@@ -6,6 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 
+USALIGN_NOTE = (
+    "official US-align TM-score, normalised by the native. Comparable with "
+    "published CASP RNA results."
+)
+
 METRIC_CAVEAT = (
     "`tm_like` is an internal TM-score-shaped statistic computed from chain/window "
     "aligned RMSD, not official US-align TM-score. Values are internally comparable "
@@ -22,6 +27,8 @@ def render_ensemble_report(
     pairwise: pd.DataFrame,
     source_shift: pd.DataFrame,
     top_k: int,
+    label_metric: str = "true_tm_like",
+    coverage: pd.DataFrame | None = None,
     ties: pd.DataFrame | None = None,
     versus_random: pd.DataFrame | None = None,
 ) -> str:
@@ -39,7 +46,8 @@ def render_ensemble_report(
         f"- Targets with native labels: "
         f"`{features.loc[features['has_native'], 'target_id'].nunique()}`",
         f"- Top-k: `{top_k}`",
-        f"- Metric caveat: {METRIC_CAVEAT}",
+        f"- Ground-truth metric: `{label_metric}`",
+        f"- Metric caveat: {METRIC_CAVEAT if label_metric != 'usalign_tm' else USALIGN_NOTE}",
         "",
         "## Candidate Sources",
         "",
@@ -59,6 +67,22 @@ def render_ensemble_report(
             ]
         )
         return "\n".join(lines)
+
+    if coverage is not None and not coverage.empty and int(coverage["unlabelled"].sum()):
+        lines.extend(
+            [
+                "## Label Coverage",
+                "",
+                f"`{int(coverage['unlabelled'].sum())}` candidates could not be scored with "
+                f"`{label_metric}` and are excluded from every metric below. US-align "
+                "represents an RNA residue by C3', so candidates deposited as C4'-only "
+                "backbone traces cannot be scored without changing the representative "
+                "atom, which would break comparability with published CASP numbers.",
+                "",
+                coverage.to_markdown(index=False),
+                "",
+            ]
+        )
 
     if versus_random is not None and not versus_random.empty:
         lines.extend(

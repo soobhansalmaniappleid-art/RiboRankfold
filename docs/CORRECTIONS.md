@@ -233,3 +233,61 @@ the typical candidate under either law (mean log(Rg / expected) −0.09 vs 0.00
 under the pool law). The right size target seems to lie between "typical
 prediction" and "collapsed". A size law fitted on long native RNAs would be
 needed to test this properly. The shipped mode keeps the pool-fitted law.
+
+## 2026-09-24 — the "weak candidate pool" was a metric artifact
+
+### What changed
+
+`riborank/usalign.py` now runs the official US-align binary, and CASP15 is
+labelled with real TM-score (`usalign_tm`) instead of the internal `tm_like`
+approximation. 1355 of 1392 candidates are scored; the rest are C4'-only traces
+US-align cannot parse (docs/METRICS.md).
+
+### What was wrong
+
+Every earlier report in this repository concluded that the candidate pool was
+almost worthless. `reports/evaluation/casp15_expanded_digest.md` reported a
+best-of-pool around 0.32 and a median candidate around 0.036, and the README
+said the ranker had little to find.
+
+Under the official metric, best-of-pool per target is **0.45–0.79** and the
+median candidate is **0.20–0.42**.
+
+| target | `tm_like` best | official TM best |
+|---|---:|---:|
+| R1116 | 0.081 | **0.668** |
+| R1136 | 0.459 | 0.748 |
+| R1128 | 0.617 | 0.785 |
+| R1138 | 0.200 | 0.650 |
+
+`tm_like` applied the TM-score formula to one global RMSD, so a few badly
+placed residues sank the whole score. The two metrics correlate at only
+rho = 0.69 within a target and disagree on which candidate is best for 4 of 10
+targets, so `tm_like` was not even a usable stand-in ordering.
+
+### What this changes
+
+- **The pool was never the problem.** There are genuinely good candidates to
+  find; nothing was excusing the rankers.
+- **The rankers look worse, not better.** With a correct metric, the top-1 pick
+  of `hybrid`, `contact` and `compact` sits at percentile **13–16** instead of
+  40–43. They are far below random, not slightly below.
+- **`plausibility` is the only mode above random on the top-1 pick**
+  (percentile 57.1) and has the best pairwise accuracy (0.625). It is still
+  within the random interval on best-of-5.
+- The conclusion that no mode beats random selection survives the metric change.
+
+### Status of the `real` benchmark
+
+`data/real` is entirely C4'-only, natives included, so it cannot be scored with
+US-align and still reports `true_tm_like`. Its reports carry a warning. It is
+synthetic anyway (native plus perturbed decoys) and should not be cited as
+evidence about real prediction pools.
+
+### Lesson
+
+Three previous corrections here were about how candidates were *ordered*. This
+one was about how they were *measured*, and it moved more than all the others
+combined. A homemade metric that looks like a standard one, and correlates with
+it at rho = 0.69, is not a stand-in for it — it is a different quantity with a
+misleading name.

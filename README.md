@@ -11,35 +11,39 @@ Two things live in this repository:
 
 ## Status, stated plainly
 
-**No scoring mode here beats picking candidates at random on real predictions.**
+**No scoring mode here beats picking candidates at random.** Measured with
+official US-align TM-score on CASP15 (10 targets, 1355 scored candidates),
+tie-aware, against the exact random expectation of **0.422**
+(95%: 0.354–0.490):
 
-On CASP15 (10 targets, ~139 candidates each), measured tie-aware against the
-exact random expectation:
-
-| mode | best-of-5 | vs random (0.139; 95%: 0.083–0.204) | top-1 pick percentile |
+| mode | best-of-5 | vs random | top-1 pick percentile |
 |---|---:|---|---:|
-| `plausibility` | 0.097 | within | **56.9** |
-| `low_clash` | 0.147 | within (it is random: 96% of scores tie) | 49.8 |
-| `contact` | 0.062 | **below** | 40.2 |
-| `compact` | 0.060 | **below** | 41.0 |
-| `hybrid` | 0.059 | **below** | 43.5 |
+| `plausibility` | 0.394 | within random | 57.1 |
+| `low_clash` | 0.430 | within random | 51.0 |
+| `contact` | 0.317 | below random | 13.2 |
+| `hybrid` | 0.312 | below random | 15.9 |
+| `compact` | 0.275 | below random | 15.7 |
 
-No mode ever ranks the best candidate first. The features carry real but
-weak signal: pairwise ordering accuracy is 0.61–0.66, against 0.5 for chance.
-But the original modes reward compactness without limit, so their top pick
-is a collapsed structure. `plausibility` removes that failure. It gives the
-best typical pick of any mode but does not find the best candidate.
+Random picks at percentile 50 by definition. Three modes land near **15**,
+because they reward compactness without limit and their top pick is a collapsed
+structure. `plausibility` fixes that and is the only mode above 50, with the
+best pairwise ordering accuracy (0.625 against 0.5 for chance), but it still
+does not retrieve the best candidate.
+
+The candidate pool is far better than earlier reports claimed: best-of-pool is
+0.45–0.79 real TM-score, not the ~0.3 the internal metric suggested. That
+number was a metric artifact, now corrected.
 
 This is an evaluation harness that measures honestly, plus a discovery
 architecture. It is not a competitive structure-ranking method. See
-[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for three successive corrections
-to how results were measured here; the second and third correct the earlier fixes.
+[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for four corrections to how results
+were measured here; three of them corrected my own earlier fixes.
 
 ## Install
 
 ```bash
 pip install -e ".[dev,ml]"
-pytest                      # 143 tests
+pytest                      # 172 tests
 ```
 
 Requires Python 3.11+.
@@ -118,7 +122,7 @@ discovery/          staged discovery funnel  (docs/DISCOVERY.md)
   demo.py             end-to-end run on synthetic data
 
 scripts/            CLI entry points
-tests/              143 tests, no network required
+tests/              172 tests, no network required
 reports/            generated evaluation artifacts
 docs/               METRICS, CORRECTIONS, DISCOVERY, VENDORED
 ```

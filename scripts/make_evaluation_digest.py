@@ -32,7 +32,15 @@ def main() -> None:
     lines.append(f"- Targets with native labels: `{features['target_id'].nunique()}`")
     lines.append(f"- Candidate structures: `{len(features)}`")
     lines.append(f"- Candidate source: {args.candidate_source}")
-    lines.append("- Metric status: internal chain/window-aware `TM-like`, not official US-align TM-score")
+    metric = (
+        features["label_metric"].iloc[0] if "label_metric" in features.columns else "unknown"
+    )
+    lines.append(f"- Ground-truth metric: `{metric}`")
+    if metric != "usalign_tm":
+        lines.append(
+            "- WARNING: not official US-align TM-score; these numbers are not "
+            "comparable with published CASP results"
+        )
     lines.append("")
 
     if versus_random is not None:
@@ -62,9 +70,9 @@ def main() -> None:
         "oracle_type",
         "method",
         "targets",
-        "mean_best_of_k_tm_like",
+        "mean_best_of_k_quality",
         "mean_best_of_k_multi_metric",
-        "mean_tm_like_regret",
+        "mean_quality_regret",
         "mean_rmsd_regret",
         "oracle_hit_rate",
     ]
@@ -98,7 +106,7 @@ def main() -> None:
 
     top_method = (
         method[method["oracle_type"] == "tm_like"]
-        .sort_values(["mean_best_of_k_tm_like", "oracle_hit_rate"], ascending=False)
+        .sort_values(["mean_best_of_k_quality", "oracle_hit_rate"], ascending=False)
         .iloc[0]
     )
     best_pairwise = pairwise.sort_values("mean_pairwise_accuracy", ascending=False).iloc[0]
@@ -107,8 +115,8 @@ def main() -> None:
     lines.append("## Main Finding")
     lines.append("")
     lines.append(
-        f"Best top-5 TM-like mode is `{top_method['method']}` "
-        f"with mean best-of-5 TM-like `{top_method['mean_best_of_k_tm_like']:.6f}`. "
+        f"Best top-5 mode is `{top_method['method']}` "
+        f"with mean best-of-5 `{top_method['mean_best_of_k_quality']:.6f}`. "
         f"Best pairwise mode is `{best_pairwise['method']}` "
         f"with mean pairwise accuracy `{best_pairwise['mean_pairwise_accuracy']:.6f}`."
     )
@@ -127,10 +135,10 @@ def main() -> None:
         "method",
         "num_candidates",
         "oracle_candidate",
-        "oracle_tm_like",
+        "oracle_quality",
         "selected_best_in_top5_candidate",
-        "best_of_5_tm_like",
-        "tm_like_regret",
+        "best_of_5_quality",
+        "quality_regret",
         "oracle_in_top5",
     ]
     miss = per_target[per_target["oracle_type"] == "tm_like"][per_cols]

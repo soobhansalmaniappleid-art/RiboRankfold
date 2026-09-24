@@ -22,8 +22,8 @@ def make_frame(n: int = 10, seed: int = 0) -> pd.DataFrame:
             "candidate_id": [f"c{i}" for i in range(n)],
             "candidate_source": ["casp"] * n,
             "has_native": [True] * n,
-            "true_tm_like": tm,
-            "true_rmsd": 20.0 - 20.0 * tm,
+            "true_quality": tm,
+            "true_rmsd_used": 20.0 - 20.0 * tm,
             "contact_map_f1": tm,
             "multi_metric_quality": tm,
             "contact_density": rng.random(n),
@@ -40,24 +40,24 @@ def make_frame(n: int = 10, seed: int = 0) -> pd.DataFrame:
 def test_a_perfect_ranker_has_hit_rate_one():
     frame = add_scores(make_frame())
     # Overwrite one scoring mode with the ground truth itself.
-    frame["score_hybrid"] = frame["true_tm_like"]
+    frame["score_hybrid"] = frame["true_quality"]
     per_target = evaluate_per_target(frame, top_k=3)
     hybrid = per_target[
         (per_target["method"] == "hybrid") & (per_target["oracle_type"] == "tm_like")
     ]
     assert hybrid["oracle_in_top3"].all()
-    assert hybrid["tm_like_regret"].abs().max() == pytest.approx(0.0)
+    assert hybrid["quality_regret"].abs().max() == pytest.approx(0.0)
 
 
 def test_an_inverted_ranker_misses_the_oracle():
     frame = add_scores(make_frame())
-    frame["score_hybrid"] = -frame["true_tm_like"]
+    frame["score_hybrid"] = -frame["true_quality"]
     per_target = evaluate_per_target(frame, top_k=3)
     hybrid = per_target[
         (per_target["method"] == "hybrid") & (per_target["oracle_type"] == "tm_like")
     ]
     assert not hybrid["oracle_in_top3"].any()
-    assert hybrid["tm_like_regret"].min() > 0.0
+    assert hybrid["quality_regret"].min() > 0.0
 
 
 def test_top_k_covering_the_pool_always_hits():
@@ -69,34 +69,34 @@ def test_top_k_covering_the_pool_always_hits():
 def test_regret_is_never_negative():
     frame = add_scores(make_frame(seed=3))
     per_target = evaluate_per_target(frame, top_k=3)
-    assert (per_target["tm_like_regret"] >= -1e-12).all()
+    assert (per_target["quality_regret"] >= -1e-12).all()
     assert (per_target["rmsd_regret"] >= -1e-12).all()
 
 
 def test_pairwise_accuracy_is_one_for_a_perfect_ranker():
     frame = add_scores(make_frame())
-    frame["score_hybrid"] = frame["true_tm_like"]
+    frame["score_hybrid"] = frame["true_quality"]
     summary = pairwise_ranking_accuracy(frame).set_index("method")
     assert summary.loc["hybrid", "mean_pairwise_accuracy"] == pytest.approx(1.0)
 
 
 def test_pairwise_accuracy_is_zero_for_an_inverted_ranker():
     frame = add_scores(make_frame())
-    frame["score_hybrid"] = -frame["true_tm_like"]
+    frame["score_hybrid"] = -frame["true_quality"]
     summary = pairwise_ranking_accuracy(frame).set_index("method")
     assert summary.loc["hybrid", "mean_pairwise_accuracy"] == pytest.approx(0.0)
 
 
 def test_tied_labels_are_excluded_from_the_denominator():
     frame = add_scores(make_frame(n=6))
-    frame["true_tm_like"] = 0.5
+    frame["true_quality"] = 0.5
     summary = pairwise_ranking_accuracy(frame)
     assert (summary["pairwise_comparisons"] == 0).all()
 
 
 def test_unlabeled_rows_are_dropped():
     frame = add_scores(make_frame())
-    frame.loc[frame.index[:5], "true_tm_like"] = np.nan
+    frame.loc[frame.index[:5], "true_quality"] = np.nan
     frame.loc[frame.index[:5], "true_rmsd"] = np.nan
     frame.loc[frame.index[:5], "multi_metric_quality"] = np.nan
     per_target = evaluate_per_target(frame, top_k=2)
@@ -105,7 +105,7 @@ def test_unlabeled_rows_are_dropped():
 
 def test_empty_input_produces_empty_output():
     empty = pd.DataFrame(
-        columns=["target_id", "true_tm_like", "true_rmsd", "multi_metric_quality"]
+        columns=["target_id", "true_quality", "true_rmsd", "multi_metric_quality"]
     )
     assert evaluate_per_target(empty).empty
     assert summarize_methods(pd.DataFrame()).empty

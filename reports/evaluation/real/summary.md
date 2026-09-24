@@ -7,6 +7,7 @@
 - Candidates: `1367`
 - Targets with native labels: `40`
 - Top-k: `5`
+- Ground-truth metric: `true_tm_like`
 - Metric caveat: `tm_like` is an internal TM-score-shaped statistic computed from chain/window aligned RMSD, not official US-align TM-score. Values are internally comparable but must not be compared against published CASP TM-scores.
 
 ## Candidate Sources
@@ -31,7 +32,7 @@ Read this first. Each mode is compared with picking candidates at random from th
 
 ## Method Metrics
 
-| oracle_type   | method       |   targets |   mean_best_of_k_tm_like |   mean_best_of_k_multi_metric |   mean_tm_like_regret |   mean_multi_metric_regret |   mean_rmsd_regret |   oracle_hit_rate |
+| oracle_type   | method       |   targets |   mean_best_of_k_quality |   mean_best_of_k_multi_metric |   mean_quality_regret |   mean_multi_metric_regret |   mean_rmsd_regret |   oracle_hit_rate |
 |:--------------|:-------------|----------:|-------------------------:|------------------------------:|----------------------:|---------------------------:|-------------------:|------------------:|
 | tm_like       | low_clash    |        40 |                 0.576129 |                      0.58619  |              0.151564 |                   0.102194 |           0.344628 |             0.45  |
 | multi_metric  | low_clash    |        40 |                 0.574973 |                      0.586793 |              0.152721 |                   0.101591 |           0.350657 |             0.45  |
@@ -273,7 +274,7 @@ A high `tied_fraction` means the mode's top-k is mostly decided by tie-breaking 
 
 ## Per-Target Metrics
 
-| target_id   | method       | oracle_type   |   num_candidates | oracle_candidate          |   oracle_tm_like |   oracle_rmsd |   oracle_contact_f1 |   oracle_multi_metric_quality | selected_top1_candidate    |   selected_top1_tm_like |   selected_top1_rmsd |   selected_top1_contact_f1 |   selected_top1_multi_metric_quality | selected_best_in_top5_candidate   |   best_of_5_tm_like |   best_of_5_rmsd |   best_of_5_contact_f1 |   best_of_5_multi_metric_quality |   tm_like_regret |   rmsd_regret |   multi_metric_regret | oracle_in_top5   |
+| target_id   | method       | oracle_type   |   num_candidates | oracle_candidate          |   oracle_quality |   oracle_rmsd |   oracle_contact_f1 |   oracle_multi_metric_quality | selected_top1_candidate    |   selected_top1_quality |   selected_top1_rmsd |   selected_top1_contact_f1 |   selected_top1_multi_metric_quality | selected_best_in_top5_candidate   |   best_of_5_quality |   best_of_5_rmsd |   best_of_5_contact_f1 |   best_of_5_multi_metric_quality |   quality_regret |   rmsd_regret |   multi_metric_regret | oracle_in_top5   |
 |:------------|:-------------|:--------------|-----------------:|:--------------------------|-----------------:|--------------:|--------------------:|------------------------------:|:---------------------------|------------------------:|---------------------:|---------------------------:|-------------------------------------:|:----------------------------------|--------------------:|-----------------:|-----------------------:|---------------------------------:|-----------------:|--------------:|----------------------:|:-----------------|
 | 1EHZ        | hybrid       | tm_like       |               35 | decoy_001_small_noise     |         0.927983 |      0.745183 |            0.942222 |                      0.885855 | decoy_014_partial_collapse |              0.0884128  |             8.58927  |                  0.544794  |                          0.216068    | decoy_002_medium_noise            |          0.705278   |         1.72918  |               0.893805 |                      0.726572    |        0.222705  |     0.983999  |            0.159283   | False            |
 | 1EHZ        | hybrid       | multi_metric  |               35 | decoy_001_small_noise     |         0.927983 |      0.745183 |            0.942222 |                      0.885855 | decoy_014_partial_collapse |              0.0884128  |             8.58927  |                  0.544794  |                          0.216068    | decoy_002_medium_noise            |          0.705278   |         1.72918  |               0.893805 |                      0.726572    |        0.222705  |     0.983999  |            0.159283   | False            |
