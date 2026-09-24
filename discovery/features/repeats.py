@@ -81,6 +81,7 @@ def find_repeat_arrays(
     max_period: int = 400,
     max_period_cv: float = 0.25,
     min_identity: float = 0.80,
+    max_missing: int = 2,
 ) -> list[RepeatArray]:
     """Find tandem repeat arrays with a near-constant period.
 
@@ -109,7 +110,9 @@ def find_repeat_arrays(
     for kmer, hits in positions.items():
         if len(hits) < min_copies:
             continue
-        for run in _regular_runs(hits, min_period, max_period, max_period_cv, min_copies):
+        for run in _regular_runs(
+            hits, min_period, max_period, max_period_cv, min_copies, max_missing
+        ):
             array = _build_array(sequence, kmer, run, seed_k, max_period)
             if array is not None and array.unit_identity >= min_identity:
                 arrays.append(array)
@@ -123,8 +126,24 @@ def _regular_runs(
     max_period: int,
     max_period_cv: float,
     min_copies: int,
+    max_missing: int = 2,
 ) -> list[list[int]]:
-    """Split k-mer hit positions into maximal runs of acceptable, regular period."""
+    """Split k-mer hit positions into maximal runs of acceptable, regular period.
+
+    Regularity is judged on the *inferred* period, not on raw gaps. Real arrays
+    have degenerate copies, and a single point mutation inside the seed k-mer
+    hides that copy, leaving one gap of roughly twice the period. Measured on
+    raw gaps that one absence is enough to reject a genuine array: gaps of
+    ``[140, 280, 140, 140, ...]`` have a coefficient of variation of 0.35,
+    well past a 0.25 threshold, even though every copy is exactly in place.
+
+    So a gap that is close to an integer multiple of the run's base period is
+    treated as that many periods with copies missing, and regularity is scored
+    on the per-period residuals. This is what array finders do, and without it
+    the detector only works on sequence too clean to be real — which is
+    precisely how it passed on synthetic data and failed on a spike into a real
+    genome.
+    """
     runs: list[list[int]] = []
     current = [hits[0]]
     for previous, position in pairwise(hits):
@@ -141,17 +160,61 @@ def _regular_runs(
     accepted = []
     for run in runs:
         gaps = [float(b - a) for a, b in pairwise(run)]
-        mean = _mean(gaps)
-        if mean and _std(gaps) / mean <= max_period_cv:
+        if _period_cv(gaps, max_multiple=max_missing + 1) <= max_period_cv:
             accepted.append(run)
     return accepted
+
+
+#: A gap must land this close to a multiple of the base period to count as a
+#: missed copy rather than as irregular spacing.
+MULTIPLE_TOLERANCE = 0.12
+
+#: At least this share of gaps must be a single period. Allowing missed copies
+#: weakens the irregularity test, and without this floor a motif scattered at
+#: arbitrary distances is "explained" as an array with copies missing
+#: everywhere — which is how the first version of this fix silently turned a
+#: decoy into a detection.
+MIN_SINGLE_PERIOD_SHARE = 0.6
+
+
+def _period_cv(gaps: list[float], max_multiple: int = 3) -> float:
+    """Coefficient of variation after allowing for missed copies.
+
+    The base period is the smallest gap, since a gap can only ever be longer
+    than one period (a missed copy) and never shorter. Each gap is divided by
+    its nearest integer multiple, and the spread of those normalised periods is
+    what regularity means here.
+    """
+    if not gaps:
+        return math.inf
+    base = min(gaps)
+    if base <= 0:
+        return math.inf
+
+    periods = []
+    singles = 0
+    for gap in gaps:
+        multiple = min(max(1, round(gap / base)), max_multiple)
+        # A gap that is not close to a multiple of the base is genuine
+        # irregularity, not a missed copy, and must not be normalised away.
+        if abs(gap / multiple - base) > MULTIPLE_TOLERANCE * base:
+            return math.inf
+        singles += multiple == 1
+        periods.append(gap / multiple)
+
+    if singles / len(gaps) < MIN_SINGLE_PERIOD_SHARE:
+        return math.inf
+    mean = _mean(periods)
+    return _std(periods) / mean if mean else math.inf
 
 
 def _build_array(
     sequence: str, kmer: str, run: list[int], seed_k: int, max_period: int
 ) -> RepeatArray | None:
     gaps = [float(b - a) for a, b in pairwise(run)]
-    mean_period = _mean(gaps)
+    # The base period is the smallest gap: a gap can only be longer than one
+    # period (a copy whose seed was mutated away), never shorter.
+    mean_period = min(gaps) if gaps else math.nan
     if not mean_period or math.isnan(mean_period):
         return None
 
@@ -178,7 +241,7 @@ def _build_array(
         unit_length=unit_length,
         copy_count=len(run),
         mean_period=mean_period,
-        period_cv=_std(gaps) / mean_period,
+        period_cv=_period_cv(gaps),
         unit_identity=_mean(identities),
         consensus=_consensus(units),
         positions=list(run),
