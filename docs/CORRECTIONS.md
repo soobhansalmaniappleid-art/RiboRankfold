@@ -291,3 +291,55 @@ one was about how they were *measured*, and it moved more than all the others
 combined. A homemade metric that looks like a standard one, and correlates with
 it at rho = 0.69, is not a stand-in for it — it is a different quantity with a
 misleading name.
+
+## 2026-09-24 — the retrieval hypothesis, tested and not supported
+
+### The hypothesis
+
+A mode can be useless at picking one candidate and still be useful at shrinking
+139 candidates to 20 for an expensive downstream scorer. Pairwise accuracy is
+0.58–0.63, clearly above chance, so the information might survive into top-k
+even though argmax fails. If so, RiboRank is a retrieval stage, not a predictor.
+
+### The test
+
+`riborank.ranking.retrieval_curve` reports, per (mode, k), the tie-aware hit@k,
+the exact random expectation, a bootstrap interval, a paired sign-flip
+permutation p-value, and Holm-Bonferroni correction across the whole grid.
+
+### The result
+
+**No (mode, k) survives correction.** On CASP15, k = 10, 25, 50, 75:
+
+| mode | k | hit@k | random | delta | p | survives |
+|---|---:|---:|---:|---:|---:|---|
+| `contact` | 50 | 0.800 | 0.375 | +0.425 | 0.014 | no |
+| `contact` | 75 | 0.900 | 0.562 | +0.338 | 0.010 | no |
+| `compact` | 75 | 0.800 | 0.562 | +0.238 | 0.050 | no |
+| `contact` | 25 | 0.300 | 0.187 | +0.113 | 0.210 | no |
+| `plausibility` | 25 | 0.100 | 0.187 | −0.087 | 0.756 | no |
+
+`contact` at k = 50 and 75 is the only thing that looks real, and it is exactly
+what a 20-comparison grid on 10 targets produces by chance. Its raw p of 0.014
+needs to clear a Holm threshold of 0.0025.
+
+At the k values that would actually be useful — k ≤ 25, a 5x reduction — every
+mode is within noise of random, and `plausibility` is below it.
+
+### The more useful finding: the benchmark is underpowered
+
+A paired sign-flip test on *n* targets cannot produce a p-value below 2^−n. With
+10 targets the floor is 0.001, so across a 20-comparison grid almost nothing can
+reach significance however good it is.
+`tests/test_random_baseline.py::test_a_small_benchmark_cannot_detect_even_a_perfect_ranker`
+makes this concrete: on 5 targets, a **perfect** ranker fails to survive
+correction.
+
+`riborank.ranking.targets_needed` sizes the fix. Detecting a +0.15 hit-rate gain
+at k = 25 over a 0.187 baseline, at 80% power, needs **≈42 targets**. CASP15 RNA
+provides 10.
+
+So the next step for RiboRank is not another scoring function. It is more
+labelled targets — CASP16 RNA, RNA-Puzzles, or decoy sets built from PDB
+structures — because at n = 10 the benchmark cannot distinguish a good reranker
+from a lucky one.

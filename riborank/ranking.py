@@ -450,3 +450,131 @@ def pick_diagnostics(
     ordered = ["method", "verdict", best_col, "random_low", "random_high",
                "mean_percentile_of_pick", *[f"hit@{k}" for k in hit_ks]]
     return frame[ordered]
+
+
+# -- retrieval curve -----------------------------------------------------
+#
+# A mode can be useless at picking one candidate and still be useful at
+# shrinking 139 candidates to 20 for an expensive downstream scorer. That is a
+# different question from ranking, and it needs its own test: does the oracle
+# survive into the top k more often than random selection puts it there?
+
+DEFAULT_CURVE_KS = (1, 2, 5, 10, 20, 25, 50, 75, 100)
+
+
+def _oracle_index(group: pd.DataFrame) -> int:
+    oracle_id = _sort_by_oracle(group, "tm_like").iloc[0].candidate_id
+    return int(np.flatnonzero(group["candidate_id"].to_numpy() == oracle_id)[0])
+
+
+def _retrieval_deltas(
+    groups: list[tuple[str, pd.DataFrame]], score_column: str | None, k: int
+) -> np.ndarray:
+    """Per-target hit@k minus the exact random expectation for that pool."""
+    deltas = []
+    for _, group in groups:
+        scores = (
+            np.zeros(len(group))
+            if score_column is None
+            else pd.to_numeric(group[score_column], errors="coerce").fillna(-np.inf).to_numpy()
+        )
+        result = tie_aware_pick(
+            scores, group["true_quality"].to_numpy(), _oracle_index(group), (k,), k
+        )
+        deltas.append(result[f"hit@{k}"] - min(k, len(group)) / len(group))
+    return np.asarray(deltas, dtype=float)
+
+
+def _sign_flip_p(deltas: np.ndarray, draws: int, rng: np.random.Generator) -> float:
+    """One-sided paired permutation p-value for mean(deltas) > 0."""
+    observed = float(deltas.mean())
+    flips = rng.choice([-1.0, 1.0], size=(draws, len(deltas)))
+    null = (flips * deltas).mean(axis=1)
+    return float((np.sum(null >= observed) + 1) / (draws + 1))
+
+
+def _holm(p_values: list[float]) -> list[bool]:
+    """Holm-Bonferroni step-down at the 0.05 family-wise level."""
+    order = sorted(range(len(p_values)), key=lambda i: p_values[i])
+    survives = [False] * len(p_values)
+    still_rejecting = True
+    for rank, index in enumerate(order):
+        threshold = 0.05 / (len(p_values) - rank)
+        still_rejecting = still_rejecting and p_values[index] <= threshold
+        survives[index] = still_rejecting
+    return survives
+
+
+def retrieval_curve(
+    features: pd.DataFrame,
+    ks: tuple[int, ...] = DEFAULT_CURVE_KS,
+    draws: int = 20000,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Does a mode retain the best candidate in its top k better than random?
+
+    Reports, per (mode, k): tie-aware ``hit@k``, the exact random expectation,
+    their difference, a bootstrap interval, a paired sign-flip permutation
+    p-value, and whether it survives Holm-Bonferroni correction across the whole
+    grid.
+
+    The correction is not optional. Sweeping several modes over several k values
+    produces dozens of comparisons, and on a ten-target benchmark the largest of
+    them will look significant by chance.
+    """
+    labeled = features.dropna(subset=["true_quality"])
+    if labeled.empty:
+        return pd.DataFrame()
+    groups = [(target_id, group) for target_id, group in labeled.groupby("target_id")]
+    rng = np.random.default_rng(seed)
+
+    rows = []
+    for score_column in SCORE_COLUMNS:
+        if score_column not in labeled.columns:
+            continue
+        for k in ks:
+            deltas = _retrieval_deltas(groups, score_column, k)
+            random_rate = float(
+                np.mean([min(k, len(g)) / len(g) for _, g in groups])
+            )
+            boot = np.array(
+                [deltas[rng.integers(0, len(deltas), len(deltas))].mean() for _ in range(2000)]
+            )
+            rows.append(
+                {
+                    "method": method_name(score_column),
+                    "k": k,
+                    "hit@k": float(deltas.mean() + random_rate),
+                    "random_hit@k": random_rate,
+                    "delta": float(deltas.mean()),
+                    "delta_low": float(np.percentile(boot, 2.5)),
+                    "delta_high": float(np.percentile(boot, 97.5)),
+                    "p_value": _sign_flip_p(deltas, draws, rng),
+                }
+            )
+    frame = pd.DataFrame(rows)
+    frame["survives_holm"] = _holm(list(frame["p_value"]))
+    frame["targets"] = len(groups)
+    return frame
+
+
+def targets_needed(
+    delta: float, baseline: float, power: float = 0.8, alpha: float = 0.05
+) -> int:
+    """Rough number of targets needed to detect ``delta`` in a hit-rate.
+
+    A normal approximation for a one-sample proportion shift, intended for
+    sizing a benchmark rather than for reporting a result.
+    """
+    if not 0.0 < baseline < 1.0 or delta <= 0.0:
+        raise ValueError("baseline must be in (0, 1) and delta positive")
+    from math import ceil
+
+    # Inverse normal CDF at the two points we need, without scipy.
+    z = {0.8: 0.8416, 0.9: 1.2816, 0.95: 1.6449}
+    z_power = z.get(round(power, 2))
+    z_alpha = z.get(round(1 - alpha, 2))
+    if z_power is None or z_alpha is None:
+        raise ValueError("power must be 0.8/0.9/0.95 and alpha 0.05/0.1/0.2")
+    variance = baseline * (1.0 - baseline)
+    return int(ceil(((z_alpha + z_power) ** 2) * variance / (delta**2))) or 1

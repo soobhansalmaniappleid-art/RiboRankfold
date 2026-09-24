@@ -186,3 +186,78 @@ def test_diagnostics_do_not_depend_on_candidate_names():
         pick_diagnostics(frame, draws=200)[columns],
         pick_diagnostics(renamed, draws=200)[columns],
     )
+
+
+# -- retrieval curve ----------------------------------------------------
+
+
+def test_a_perfect_ranker_retrieves_at_every_k():
+    from riborank.ranking import retrieval_curve
+
+    # 20 targets: a sign-flip test on 8 targets bottoms out at p ~ 2^-8, which
+    # is too close to the Holm threshold for a stable assertion.
+    frame = multi_target_frame(targets=20)
+    frame["score_hybrid"] = frame["true_quality"]
+    curve = retrieval_curve(frame, ks=(1, 5), draws=2000)
+    hybrid = curve[curve["method"] == "hybrid"].set_index("k")
+    assert hybrid.loc[1, "hit@k"] == pytest.approx(1.0)
+    assert hybrid.loc[5, "hit@k"] == pytest.approx(1.0)
+    assert bool(hybrid.loc[1, "survives_holm"])
+
+
+def test_a_small_benchmark_cannot_detect_even_a_perfect_ranker():
+    """The sign-flip floor is 2^-n, so ten targets cannot clear a wide grid."""
+    from riborank.ranking import retrieval_curve
+
+    frame = multi_target_frame(targets=5)
+    frame["score_hybrid"] = frame["true_quality"]
+    curve = retrieval_curve(frame, ks=(1, 2, 5, 10), draws=2000)
+    assert not curve["survives_holm"].any()
+
+
+def test_an_uninformative_ranker_does_not_survive_correction():
+    from riborank.ranking import retrieval_curve
+
+    frame = multi_target_frame()
+    frame["score_hybrid"] = 0.0  # fully tied, i.e. random
+    curve = retrieval_curve(frame, ks=(1, 5, 10), draws=2000)
+    hybrid = curve[curve["method"] == "hybrid"]
+    assert not hybrid["survives_holm"].any()
+    assert hybrid["delta"].abs().max() == pytest.approx(0.0, abs=1e-9)
+
+
+def test_random_expectation_matches_k_over_pool_size():
+    from riborank.ranking import retrieval_curve
+
+    curve = retrieval_curve(multi_target_frame(per_target=30), ks=(3,), draws=500)
+    assert curve["random_hit@k"].iloc[0] == pytest.approx(3 / 30)
+
+
+def test_holm_is_stricter_than_the_raw_p_value():
+    from riborank.ranking import _holm
+
+    # A single p just under 0.05 survives alone but not in a family of twenty.
+    assert _holm([0.04]) == [True]
+    assert _holm([0.04] + [0.9] * 19)[0] is False
+
+
+def test_holm_is_step_down_not_bonferroni():
+    from riborank.ranking import _holm
+
+    assert _holm([0.001, 0.02]) == [True, True]  # 0.02 <= 0.05/1 once the first rejects
+
+
+def test_targets_needed_grows_as_the_effect_shrinks():
+    from riborank.ranking import targets_needed
+
+    assert targets_needed(0.4, 0.375) < targets_needed(0.15, 0.187)
+    assert targets_needed(0.15, 0.187, power=0.9) > targets_needed(0.15, 0.187, power=0.8)
+
+
+def test_targets_needed_rejects_impossible_inputs():
+    from riborank.ranking import targets_needed
+
+    with pytest.raises(ValueError):
+        targets_needed(0.0, 0.5)
+    with pytest.raises(ValueError):
+        targets_needed(0.1, 1.5)

@@ -20,6 +20,7 @@ from riborank.ranking import (
     evaluate_per_target,
     pairwise_ranking_accuracy,
     pick_diagnostics,
+    retrieval_curve,
     source_shift_summary,
     summarize_methods,
     tie_diagnostics,
@@ -113,7 +114,7 @@ def main() -> None:
         )
 
     empty = pd.DataFrame()
-    per_target = method_metrics = pairwise = source_shift = ties = versus_random = empty
+    per_target = method_metrics = pairwise = source_shift = ties = versus_random = curve = empty
     if bool(features["has_native"].any()):
         per_target = evaluate_per_target(features, top_k=args.top_k)
         method_metrics = summarize_methods(per_target)
@@ -121,12 +122,14 @@ def main() -> None:
         source_shift = source_shift_summary(features, top_k=args.top_k)
         ties = tie_diagnostics(features)
         versus_random = pick_diagnostics(features, top_k=args.top_k)
+        curve = retrieval_curve(features)
         per_target.to_csv(args.out_dir / "per_target_metrics.csv", index=False)
         method_metrics.to_csv(args.out_dir / "method_metrics.csv", index=False)
         pairwise.to_csv(args.out_dir / "pairwise_accuracy.csv", index=False)
         source_shift.to_csv(args.out_dir / "source_shift_summary.csv", index=False)
         ties.to_csv(args.out_dir / "score_ties.csv", index=False)
         versus_random.to_csv(args.out_dir / "pick_diagnostics.csv", index=False)
+        curve.to_csv(args.out_dir / "retrieval_curve.csv", index=False)
 
     report = render_ensemble_report(
         dataset_name=dataset_name,
@@ -141,6 +144,7 @@ def main() -> None:
         coverage=coverage,
         ties=ties,
         versus_random=versus_random,
+        curve=curve,
     )
     (args.out_dir / "summary.md").write_text(report, encoding="utf-8")
     print(f"Wrote ensemble evaluation artifacts to {args.out_dir}")

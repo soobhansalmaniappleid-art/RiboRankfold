@@ -31,6 +31,7 @@ def render_ensemble_report(
     coverage: pd.DataFrame | None = None,
     ties: pd.DataFrame | None = None,
     versus_random: pd.DataFrame | None = None,
+    curve: pd.DataFrame | None = None,
 ) -> str:
     source_counts = (
         features["candidate_source"].value_counts().rename_axis("source").reset_index(name="count")
@@ -95,6 +96,32 @@ def render_ensemble_report(
                 "random selection. A mode below random is worse than no model.",
                 "",
                 versus_random.to_markdown(index=False),
+                "",
+            ]
+        )
+
+    if curve is not None and not curve.empty:
+        survivors = curve[curve["survives_holm"]]
+        lines.extend(
+            [
+                "## Retrieval Curve",
+                "",
+                "Separate question from ranking: does a mode keep the best candidate "
+                "inside its top k more often than random selection does? That is what "
+                "matters if this is used to shrink a pool for an expensive downstream "
+                "scorer. `p_value` is a paired sign-flip permutation test and "
+                "`survives_holm` corrects across the whole grid, because sweeping "
+                "modes against k values produces dozens of comparisons.",
+                "",
+                curve.round(4).to_markdown(index=False),
+                "",
+                (
+                    "No (mode, k) survives correction: this benchmark does not show "
+                    "retrieval above random."
+                    if survivors.empty
+                    else "Surviving: "
+                    + ", ".join(f"`{r.method}`@{r.k}" for r in survivors.itertuples())
+                ),
                 "",
             ]
         )

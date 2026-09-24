@@ -46,6 +46,60 @@ Read this first. Each mode is compared with picking candidates at random from th
 | plausibility | within random |    0.39423  |     0.354116 |      0.489626 |                   57.1217 | 0.02       | 0.1       | 0.1       | 0.1      |
 | random       | reference     |    0.421963 |     0.354116 |      0.489626 |                   49.7807 | 0.00749579 | 0.037479  | 0.0749579 | 0.187395 |
 
+## Retrieval Curve
+
+Separate question from ranking: does a mode keep the best candidate inside its top k more often than random selection does? That is what matters if this is used to shrink a pool for an expensive downstream scorer. `p_value` is a paired sign-flip permutation test and `survives_holm` corrects across the whole grid, because sweeping modes against k values produces dozens of comparisons.
+
+| method       |   k |   hit@k |   random_hit@k |   delta |   delta_low |   delta_high |   p_value | survives_holm   |   targets |
+|:-------------|----:|--------:|---------------:|--------:|------------:|-------------:|----------:|:----------------|----------:|
+| hybrid       |   1 |  0      |         0.0075 | -0.0075 |     -0.0082 |      -0.0069 |    1      | False           |        10 |
+| hybrid       |   2 |  0      |         0.015  | -0.015  |     -0.0163 |      -0.0139 |    1      | False           |        10 |
+| hybrid       |   5 |  0      |         0.0375 | -0.0375 |     -0.041  |      -0.0348 |    1      | False           |        10 |
+| hybrid       |  10 |  0.1    |         0.075  |  0.025  |     -0.0766 |       0.2218 |    0.4941 | False           |        10 |
+| hybrid       |  20 |  0.2    |         0.1499 |  0.0501 |     -0.1422 |       0.3357 |    0.3237 | False           |        10 |
+| hybrid       |  25 |  0.2    |         0.1874 |  0.0126 |     -0.1778 |       0.2944 |    0.435  | False           |        10 |
+| hybrid       |  50 |  0.5    |         0.3748 |  0.1252 |     -0.1653 |       0.4152 |    0.2209 | False           |        10 |
+| hybrid       |  75 |  0.8    |         0.5622 |  0.2378 |     -0.0365 |       0.4486 |    0.0531 | False           |        10 |
+| hybrid       | 100 |  0.9    |         0.7496 |  0.1504 |     -0.0554 |       0.2862 |    0.0835 | False           |        10 |
+| contact      |   1 |  0      |         0.0075 | -0.0075 |     -0.0082 |      -0.007  |    1      | False           |        10 |
+| contact      |   2 |  0      |         0.015  | -0.015  |     -0.0163 |      -0.0139 |    1      | False           |        10 |
+| contact      |   5 |  0      |         0.0375 | -0.0375 |     -0.0407 |      -0.0346 |    1      | False           |        10 |
+| contact      |  10 |  0.1    |         0.075  |  0.025  |     -0.0764 |       0.2225 |    0.5069 | False           |        10 |
+| contact      |  20 |  0.3    |         0.1499 |  0.1501 |     -0.1385 |       0.4446 |    0.1431 | False           |        10 |
+| contact      |  25 |  0.3    |         0.1874 |  0.1126 |     -0.1746 |       0.4011 |    0.21   | False           |        10 |
+| contact      |  50 |  0.8    |         0.3748 |  0.4252 |      0.1437 |       0.6326 |    0.0139 | False           |        10 |
+| contact      |  75 |  0.9    |         0.5622 |  0.3378 |      0.1262 |       0.4697 |    0.0103 | False           |        10 |
+| contact      | 100 |  1      |         0.7496 |  0.2504 |      0.1833 |       0.3049 |    0.0009 | True            |        10 |
+| low_clash    |   1 |  0.0065 |         0.0075 | -0.001  |     -0.0033 |       0.0007 |    0.7461 | False           |        10 |
+| low_clash    |   2 |  0.013  |         0.015  | -0.002  |     -0.0065 |       0.0015 |    0.7539 | False           |        10 |
+| low_clash    |   5 |  0.0326 |         0.0375 | -0.0049 |     -0.0161 |       0.0037 |    0.7483 | False           |        10 |
+| low_clash    |  10 |  0.0652 |         0.075  | -0.0098 |     -0.0326 |       0.0071 |    0.7486 | False           |        10 |
+| low_clash    |  20 |  0.1304 |         0.1499 | -0.0195 |     -0.0647 |       0.0148 |    0.7547 | False           |        10 |
+| low_clash    |  25 |  0.163  |         0.1874 | -0.0244 |     -0.0822 |       0.0185 |    0.7496 | False           |        10 |
+| low_clash    |  50 |  0.326  |         0.3748 | -0.0488 |     -0.1641 |       0.0358 |    0.7526 | False           |        10 |
+| low_clash    |  75 |  0.489  |         0.5622 | -0.0732 |     -0.2396 |       0.0544 |    0.749  | False           |        10 |
+| low_clash    | 100 |  0.752  |         0.7496 |  0.0024 |     -0.1635 |       0.1144 |    0.4946 | False           |        10 |
+| compact      |   1 |  0      |         0.0075 | -0.0075 |     -0.0081 |      -0.007  |    1      | False           |        10 |
+| compact      |   2 |  0      |         0.015  | -0.015  |     -0.0163 |      -0.0139 |    1      | False           |        10 |
+| compact      |   5 |  0      |         0.0375 | -0.0375 |     -0.0409 |      -0.0348 |    1      | False           |        10 |
+| compact      |  10 |  0      |         0.075  | -0.075  |     -0.0816 |      -0.0695 |    1      | False           |        10 |
+| compact      |  20 |  0.2    |         0.1499 |  0.0501 |     -0.1428 |       0.3347 |    0.3204 | False           |        10 |
+| compact      |  25 |  0.2    |         0.1874 |  0.0126 |     -0.178  |       0.2942 |    0.4338 | False           |        10 |
+| compact      |  50 |  0.4    |         0.3748 |  0.0252 |     -0.2569 |       0.3118 |    0.4349 | False           |        10 |
+| compact      |  75 |  0.8    |         0.5622 |  0.2378 |     -0.0322 |       0.4392 |    0.0502 | False           |        10 |
+| compact      | 100 |  0.8    |         0.7496 |  0.0504 |     -0.2188 |       0.2626 |    0.3534 | False           |        10 |
+| plausibility |   1 |  0.02   |         0.0075 |  0.0125 |     -0.0081 |       0.0529 |    0.4995 | False           |        10 |
+| plausibility |   2 |  0.04   |         0.015  |  0.025  |     -0.0161 |       0.1058 |    0.5036 | False           |        10 |
+| plausibility |   5 |  0.1    |         0.0375 |  0.0625 |     -0.0402 |       0.2644 |    0.4977 | False           |        10 |
+| plausibility |  10 |  0.1    |         0.075  |  0.025  |     -0.0807 |       0.2292 |    0.4972 | False           |        10 |
+| plausibility |  20 |  0.1    |         0.1499 | -0.0499 |     -0.1609 |       0.159  |    0.6179 | False           |        10 |
+| plausibility |  25 |  0.1    |         0.1874 | -0.0874 |     -0.202  |       0.1207 |    0.7556 | False           |        10 |
+| plausibility |  50 |  0.4    |         0.3748 |  0.0252 |     -0.2606 |       0.3233 |    0.4471 | False           |        10 |
+| plausibility |  75 |  0.8    |         0.5622 |  0.2378 |     -0.0402 |       0.4494 |    0.0616 | False           |        10 |
+| plausibility | 100 |  1      |         0.7496 |  0.2504 |      0.1847 |       0.3073 |    0.0015 | False           |        10 |
+
+Surviving: `contact`@100
+
 ## Method Metrics
 
 | oracle_type   | method       |   targets |   mean_best_of_k_quality |   mean_best_of_k_multi_metric |   mean_quality_regret |   mean_multi_metric_regret |   mean_rmsd_regret |   oracle_hit_rate |

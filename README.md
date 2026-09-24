@@ -34,16 +34,34 @@ The candidate pool is far better than earlier reports claimed: best-of-pool is
 0.45–0.79 real TM-score, not the ~0.3 the internal metric suggested. That
 number was a metric artifact, now corrected.
 
+### Is it a retrieval stage instead?
+
+A mode could be useless at picking one candidate yet still useful at shrinking
+139 candidates to 20 for an expensive downstream scorer. Tested directly
+(`retrieval_curve.csv`): **no mode survives multiple-comparison correction at
+any k**. `contact` at k=50 looks strong (hit 0.80 against 0.375 random,
+p=0.014) but needs to clear a Holm threshold of 0.0025 across the 20-comparison
+grid. At the useful k values (k<=25) every mode is within noise of random.
+
+The more useful finding is that **the benchmark is underpowered**. A paired
+sign-flip test on n targets cannot go below p = 2^-n, so at n=10 almost nothing
+can reach significance. A test in this repo shows that on 5 targets even a
+*perfect* ranker fails to survive correction. `targets_needed` estimates that
+detecting a +0.15 hit-rate gain at k=25 requires **~42 targets**; CASP15 RNA
+provides 10.
+
+So the next step is not another scoring function. It is more labelled targets.
+
 This is an evaluation harness that measures honestly, plus a discovery
 architecture. It is not a competitive structure-ranking method. See
-[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for four corrections to how results
+[docs/CORRECTIONS.md](docs/CORRECTIONS.md) for five corrections to how results
 were measured here; three of them corrected my own earlier fixes.
 
 ## Install
 
 ```bash
 pip install -e ".[dev,ml]"
-pytest                      # 172 tests
+pytest                      # 178 tests
 ```
 
 Requires Python 3.11+.
@@ -90,12 +108,14 @@ In this order:
 1. **`pick_diagnostics.csv`** — every mode against random selection from the
    same pools, tie-aware. If a mode is not above random, nothing else in the
    report matters.
-2. **`score_ties.csv`** — the fraction of candidates each mode assigns an
+2. **`retrieval_curve.csv`** — whether a mode keeps the best candidate in its
+   top k better than random, with multiple-comparison correction.
+3. **`score_ties.csv`** — the fraction of candidates each mode assigns an
    identical score. A mode that ties on most of its input is not ranking it; its
    top-k is decided by the tie-break. On CASP15, `low_clash` ties on **95.8%**.
-3. **`oracle_hit_rate`** in `method_metrics.csv` — the fraction of targets where
+4. **`oracle_hit_rate`** in `method_metrics.csv` — the fraction of targets where
    the genuinely best candidate is retrieved. This isolates ranking skill.
-4. **`mean_best_of_k_tm_like`** — measures the candidate pool as much as the
+5. **`mean_best_of_k_quality`** — measures the candidate pool as much as the
    method. A weak pool caps it no matter how good the ranker is.
 
 `tm_like` is an internal statistic, **not** official US-align TM-score. Do not
@@ -122,7 +142,7 @@ discovery/          staged discovery funnel  (docs/DISCOVERY.md)
   demo.py             end-to-end run on synthetic data
 
 scripts/            CLI entry points
-tests/              172 tests, no network required
+tests/              178 tests, mostly offline
 reports/            generated evaluation artifacts
 docs/               METRICS, CORRECTIONS, DISCOVERY, VENDORED
 ```
@@ -131,10 +151,14 @@ docs/               METRICS, CORRECTIONS, DISCOVERY, VENDORED
 
 These are real and unhidden:
 
-- **`tm_like` is not TM-score.** Replacing it with official US-align output is
-  the highest-value change available. Not done.
-- **Ten CASP15 targets.** Every conclusion rests on 10 labelled targets. That is
-  too few to support a strong claim about anything.
+- **`data/real` cannot use the official metric.** It is entirely C4'-only, so
+  US-align cannot parse it and it still reports `true_tm_like`. It is synthetic
+  anyway and is a wiring check, not evidence.
+- **Ten CASP15 targets, and that is the binding constraint.** `targets_needed`
+  puts the requirement at ~42 for the effect sizes in play. At n=10 a perfect
+  ranker would not clear multiple-comparison correction on a 20-cell grid, so
+  no amount of modelling work can be validated here. More labelled targets are
+  the prerequisite for everything else.
 - **Sub-reports are stale.** Everything under
   `reports/evaluation/casp15/*/` was produced by scripts not yet ported onto
   `riborank.ranking`, so they still carry the pre-correction baseline. See the
